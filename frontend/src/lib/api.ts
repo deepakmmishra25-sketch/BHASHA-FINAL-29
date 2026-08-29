@@ -31,7 +31,8 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
-        const refreshToken = localStorage.getItem("refresh_token");
+        const authData2 = localStorage.getItem("bhashasetu-auth");
+const refreshToken = authData2 ? JSON.parse(authData2)?.refreshToken : null;
         if (refreshToken) {
           const { data } = await axios.post(
             `${API_BASE_URL}/api/v1/auth/refresh`,
