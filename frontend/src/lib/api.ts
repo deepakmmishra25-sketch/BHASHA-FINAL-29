@@ -15,7 +15,7 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const authData = localStorage.getItem("bhashasetu-auth");
-const token = authData ? JSON.parse(authData)?.accessToken : null;
+const token = authData ? JSON.parse(authData)?.state?.accessToken : null;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -32,14 +32,14 @@ apiClient.interceptors.response.use(
       original._retry = true;
       try {
         const authData2 = localStorage.getItem("bhashasetu-auth");
-const refreshToken = authData2 ? JSON.parse(authData2)?.refreshToken : null;
+const refreshToken = authData2 ? JSON.parse(authData2)?.state?.refreshToken : null;
         if (refreshToken) {
           const { data } = await axios.post(
             `${API_BASE_URL}/api/v1/auth/refresh`,
             { refresh_token: refreshToken }
           );
           const existing = JSON.parse(localStorage.getItem("bhashasetu-auth") || "{}");
-localStorage.setItem("bhashasetu-auth", JSON.stringify({...existing, accessToken: data.access_token}));
+localStorage.setItem("bhashasetu-auth", JSON.stringify({...existing, state: {...existing.state, accessToken: data.access_token}}));
           original.headers.Authorization = `Bearer ${data.access_token}`;
           return apiClient(original);
         }
