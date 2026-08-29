@@ -36,6 +36,7 @@ class Lesson(Base):
     level: Mapped[str] = mapped_column(String(20), default="beginner")
     duration_minutes: Mapped[int] = mapped_column(Integer, default=10)
     thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    youtube_url: Mapped[str | None] = mapped_column(String, nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
