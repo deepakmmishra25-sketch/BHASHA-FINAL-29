@@ -14,7 +14,8 @@ export const apiClient = axios.create({
 // Request interceptor ΓÇö attach auth token
 apiClient.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access_token");
+    const authData = localStorage.getItem("bhashasetu-auth");
+const token = authData ? JSON.parse(authData)?.accessToken : null;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -36,7 +37,8 @@ apiClient.interceptors.response.use(
             `${API_BASE_URL}/api/v1/auth/refresh`,
             { refresh_token: refreshToken }
           );
-          localStorage.setItem("access_token", data.access_token);
+          const existing = JSON.parse(localStorage.getItem("bhashasetu-auth") || "{}");
+localStorage.setItem("bhashasetu-auth", JSON.stringify({...existing, accessToken: data.access_token}));
           original.headers.Authorization = `Bearer ${data.access_token}`;
           return apiClient(original);
         }
