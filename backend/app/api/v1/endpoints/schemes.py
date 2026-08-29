@@ -1,5 +1,5 @@
 """Government scheme endpoints + AI-powered recommendation."""
-
+from app.api.v1.dependencies import get_current_active_user
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import or_, select
