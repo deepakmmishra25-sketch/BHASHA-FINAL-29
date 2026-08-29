@@ -4,8 +4,6 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.api.v1.dependencies import get_current_active_user
 from app.core.cache import cache
 from app.core.config import settings
 from app.db.database import get_db
@@ -27,7 +25,6 @@ async def list_schemes(
     skip: int = 0,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_active_user),
 ):
     # Cache unfiltered first-page results (most common call)
     cache_key = f"schemes:list:{category or 'all'}:{skip}:{limit}" if not q else None
