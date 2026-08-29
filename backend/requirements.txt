@@ -18,6 +18,7 @@ celery==5.4.0
 pillow==11.0.0
 pytesseract==0.3.13
 aiofiles==24.1.0
+email-validator
 httpx==0.28.1
 loguru==0.7.3
 pytest==8.3.4
