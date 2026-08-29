@@ -81,6 +81,7 @@ async def list_lessons(
             "level": l.level,
             "durationMinutes": l.duration_minutes,
             "thumbnailUrl": l.thumbnail_url,
+            "youtubeUrl": l.youtube_url,
             "completed": progress_map[l.id].completed if l.id in progress_map else False,
             "bookmarked": progress_map[l.id].bookmarked if l.id in progress_map else False,
         }
@@ -121,6 +122,8 @@ async def get_lesson(
         "content": lesson.content,
         "level": lesson.level,
         "durationMinutes": lesson.duration_minutes,
+        "thumbnailUrl": lesson.thumbnail_url,
+        "youtubeUrl": lesson.youtube_url,
         "completed": progress.completed if progress else False,
         "bookmarked": progress.bookmarked if progress else False,
     }
