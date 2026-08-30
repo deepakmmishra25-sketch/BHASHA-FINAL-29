@@ -9,7 +9,6 @@ import { useAppStore } from "@/store/app.store";
 import { t } from "@/lib/translations";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { useAppStore } from "@/store/app.store";
 import apiClient from "@/lib/api";
 import { cn } from "@/lib/utils";
 
