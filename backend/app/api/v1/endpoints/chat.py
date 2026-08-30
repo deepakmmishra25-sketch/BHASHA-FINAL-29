@@ -1,4 +1,4 @@
-"""AI Chat endpoints — Gemini-powered multilingual conversation."""
+"""AI Chat endpoints — Groq-powered multilingual conversation."""
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -34,16 +34,36 @@ Key guidelines:
 Topics you can help with: business planning, farming advice, government schemes, digital payments, marketing, finance, legal basics, skill development."""
 
 
-def _get_gemini_client():
-    api_key = getattr(settings, "GEMINI_API_KEY", None)
+def _get_ai_response(history, message: str) -> str:
+    """Generate AI response using Groq (free, fast, no quota issues)."""
+    api_key = getattr(settings, "GROQ_API_KEY", None)
     if not api_key:
-        return None
+        return "🔑 GROQ_API_KEY is not configured. Please add it to your Railway environment variables."
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        return genai.GenerativeModel("models/gemini-flash-latest")
-    except Exception:
-        return None
+        import httpx
+
+        msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
+        for m in history:
+            msgs.append({"role": m.role, "content": m.content})
+        msgs.append({"role": "user", "content": message})
+
+        r = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.1-8b-instant",
+                "messages": msgs,
+                "max_tokens": 1024,
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"I'm having trouble right now. Please try again. (Error: {str(e)[:100]})"
 
 
 # ── Background task helpers ───────────────────────────────────────────────────
@@ -64,18 +84,6 @@ async def _record_chat_event(user_id: str, language: str) -> None:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
-
-@router.get("/models")
-async def list_models():
-    """Debug endpoint — shows available Gemini models. Remove after testing."""
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        models = [m.name for m in genai.list_models()]
-        return {"models": models}
-    except Exception as e:
-        return {"error": str(e)}
-
 
 @router.get("/sessions")
 async def list_sessions(
@@ -139,20 +147,7 @@ async def send_message(
     history = list(reversed(history_result.scalars().all()))
 
     # Generate AI response
-    model = _get_gemini_client()
-    if model:
-        try:
-            history_text = "\n".join(
-                f"{'User' if m.role == 'user' else 'Assistant'}: {m.content}"
-                for m in history
-            )
-            prompt = f"{SYSTEM_PROMPT}\n\nConversation so far:\n{history_text}\nUser: {data.message}\nAssistant:"
-            response = model.generate_content(prompt)
-            ai_text = response.text
-        except Exception as e:
-            ai_text = f"I'm having trouble right now. Please try again. (Error: {str(e)[:100]})"
-    else:
-        ai_text = "🔑 GEMINI_API_KEY is not configured. Please check your Railway environment variables."
+    ai_text = _get_ai_response(history, data.message)
 
     ai_msg = ChatMessage(session_id=session.id, role="assistant", content=ai_text, language=data.language)
     db.add(ai_msg)
