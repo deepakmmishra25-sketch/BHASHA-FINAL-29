@@ -6,6 +6,7 @@ import { useAppStore, SUPPORTED_LANGUAGES } from "@/store/app.store";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { t } from "@/lib/translations";
 
 export function TopBar() {
   const { user } = useAuthStore();
@@ -16,12 +17,14 @@ export function TopBar() {
       <div className="flex-1 max-w-sm">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search lessons, schemes..." className="pl-9 h-8 text-sm" />
+          <Input
+            placeholder={t(language, "searchPlaceholder")}
+            className="pl-9 h-8 text-sm"
+          />
         </div>
       </div>
 
       <div className="ml-auto flex items-center gap-3">
-        {/* Language selector */}
         <Select value={language} onValueChange={setLanguage}>
           <SelectTrigger className="h-8 w-36 text-xs">
             <SelectValue />
