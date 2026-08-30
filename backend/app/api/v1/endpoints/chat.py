@@ -1,4 +1,4 @@
-"""AI Chat endpoints — Claude-powered multilingual conversation."""
+"""AI Chat endpoints — Gemini-powered multilingual conversation."""
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -34,47 +34,30 @@ Key guidelines:
 Topics you can help with: business planning, farming advice, government schemes, digital payments, marketing, finance, legal basics, skill development."""
 
 
-def _get_ai_response(history: list, message: str) -> str:
-    """Generate AI response using Claude (Anthropic)."""
-    api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+def _get_gemini_client():
+    api_key = getattr(settings, "GEMINI_API_KEY", None)
     if not api_key:
-        return (
-            "🔑 ANTHROPIC_API_KEY is not configured. "
-            "Please add it to your Railway environment variables to enable AI responses."
-        )
+        return None
     try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=api_key)
-
-        # Build messages list from history — Claude requires alternating user/assistant roles
-        msgs = []
-        for m in history:
-            role = "user" if m.role == "user" else "assistant"
-            msgs.append({"role": role, "content": m.content})
-
-        # Append the current user message
-        msgs.append({"role": "user", "content": message})
-
-        # Ensure messages alternate properly (Claude strict requirement)
-        # If two consecutive messages have the same role, merge them
-        merged = []
-        for msg in msgs:
-            if merged and merged[-1]["role"] == msg["role"]:
-                merged[-1]["content"] += "\n" + msg["content"]
-            else:
-                merged.append(msg)
-
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=merged,
-        )
-        return response.content[0].text
-
-    except Exception as e:
-        return f"I'm having trouble connecting to the AI service right now. Please try again in a moment. (Error: {str(e)[:100]})"
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        for model_name in [
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-1.5-flash-8b",
+            "gemini-1.5-flash",
+            "gemini-pro",
+        ]:
+            try:
+                model = genai.GenerativeModel(model_name)
+                model.generate_content("hi")
+                return model
+            except Exception:
+                continue
+        return None
+    except Exception:
+        return None
 
 
 # ── Background task helpers ───────────────────────────────────────────────────
@@ -95,6 +78,18 @@ async def _record_chat_event(user_id: str, language: str) -> None:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get("/models")
+async def list_models():
+    """Temporary debug endpoint — shows available Gemini models. Remove after testing."""
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        models = [m.name for m in genai.list_models()]
+        return {"models": models}
+    except Exception as e:
+        return {"error": str(e)}
+
 
 @router.get("/sessions")
 async def list_sessions(
@@ -131,7 +126,6 @@ async def send_message(
 
     is_first_chat = False
     if not session:
-        # Check if this is the user's very first chat session
         count_q = await db.execute(
             select(func.count()).where(ChatSession.user_id == current_user.id)
         )
@@ -149,51 +143,4 @@ async def send_message(
     user_msg = ChatMessage(session_id=session.id, role="user", content=data.message, language=data.language)
     db.add(user_msg)
 
-    # Fetch recent history (last 10 messages)
-    history_result = await db.execute(
-        select(ChatMessage)
-        .where(ChatMessage.session_id == session.id)
-        .order_by(ChatMessage.created_at.desc())
-        .limit(10)
-    )
-    history = list(reversed(history_result.scalars().all()))
-
-    # Generate AI response using Claude
-    ai_text = _get_ai_response(history, data.message)
-
-    ai_msg = ChatMessage(session_id=session.id, role="assistant", content=ai_text, language=data.language)
-    db.add(ai_msg)
-
-    # First-chat welcome notification
-    if is_first_chat:
-        from app.services.notification_service import notify_first_chat
-        await notify_first_chat(db, current_user.id, current_user.language or "English")
-
-    await db.commit()
-
-    # Analytics event recorded after response is committed — non-blocking
-    background_tasks.add_task(_record_chat_event, current_user.id, data.language)
-
-    return {
-        "sessionId": session.id,
-        "userMessage": {"id": user_msg.id, "role": "user", "content": data.message},
-        "aiMessage": {"id": ai_msg.id, "role": "assistant", "content": ai_text},
-    }
-
-
-@router.get("/sessions/{session_id}/messages")
-async def get_messages(
-    session_id: str,
-    current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_db),
-):
-    result = await db.execute(
-        select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id)
-    )
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    msgs = await db.execute(
-        select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at)
-    )
-    return [{"id": m.id, "role": m.role, "content": m.content, "createdAt": m.created_at.isoformat()} for m in msgs.scalars().all()]
+    # Fetch recent history (last 10
