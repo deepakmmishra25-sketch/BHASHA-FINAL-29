@@ -17,6 +17,29 @@ import { cn } from "@/lib/utils";
 interface Message { id: number; role: "user" | "assistant"; content: string; createdAt?: string; }
 interface Session { id: string; title: string; language: string; updatedAt: string; }
 
+const PLACEHOLDERS: Record<string, string> = {
+  English: "Ask your question...",
+  Hindi: "अपना सवाल लिखें...",
+  Marathi: "तुमचा प्रश्न लिहा...",
+  Gujarati: "તમારો પ્રश्न लखो...",
+  Tamil: "உங்கள் கேள்வியை எழுதுங்கள்...",
+  Telugu: "మీ ప్రశ్న రాయండి...",
+  Kannada: "ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಬರೆಯಿರಿ...",
+  Malayalam: "നിങ്ങളുടെ ചോദ്യം എഴുതൂ...",
+  Punjabi: "ਆਪਣਾ ਸਵਾਲ ਲਿਖੋ...",
+  Bengali: "আপনার প্রশ্ন লিখুন...",
+  Urdu: "اپنا سوال لکھیں...",
+  Odia: "ଆପଣଙ୍କ ପ୍ରଶ୍ନ ଲିଖନ୍ତୁ...",
+  Assamese: "আপোনাৰ প্ৰশ্ন লিখক...",
+};
+
+const NEW_CHAT_LABELS: Record<string, string> = {
+  English: "New Chat", Hindi: "नई बातचीत", Marathi: "नवीन संवाद",
+  Gujarati: "નवी वार्तालाप", Tamil: "புதிய உரையாடல்", Telugu: "కొత్త చాట్",
+  Kannada: "ಹೊಸ ಚಾಟ್", Malayalam: "പുതിയ ചാറ്റ്", Punjabi: "ਨਵੀਂ ਗੱਲਬਾਤ",
+  Bengali: "নতুন চ্যাট", Urdu: "نئی بات", Odia: "ନୂଆ ଚାଟ୍", Assamese: "নতুন চেট",
+};
+
 export default function ChatPage() {
   const { user } = useAuthStore();
   const { language } = useAppStore();
@@ -33,10 +56,7 @@ export default function ChatPage() {
     startListening, stopListening, speak, stopSpeaking,
   } = useSpeech();
 
-  // Fill input from voice transcript
-  useEffect(() => {
-    if (transcript) setInput(transcript);
-  }, [transcript]);
+  useEffect(() => { if (transcript) setInput(transcript); }, [transcript]);
 
   const { data: sessions = [] } = useQuery<Session[]>({
     queryKey: ["chat-sessions"],
@@ -73,44 +93,30 @@ export default function ChatPage() {
     sendMutation.mutate(msg);
   };
 
-  const handleMic = () => {
-    if (isListening) stopListening();
-    else startListening(language);
-  };
+  const handleMic = () => { if (isListening) stopListening(); else startListening(language); };
 
   const handleSpeak = (msg: Message) => {
-    if (speakingId === msg.id) {
-      stopSpeaking();
-      setSpeakingId(null);
-    } else {
-      setSpeakingId(msg.id);
-      speak(msg.content, language);
-    }
+    if (speakingId === msg.id) { stopSpeaking(); setSpeakingId(null); }
+    else { setSpeakingId(msg.id); speak(msg.content, language); }
   };
 
-  // Reset speakingId when TTS finishes
-  useEffect(() => {
-    if (!isSpeaking) setSpeakingId(null);
-  }, [isSpeaking]);
+  useEffect(() => { if (!isSpeaking) setSpeakingId(null); }, [isSpeaking]);
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
       {/* Sessions sidebar */}
       <div className="w-56 shrink-0 flex flex-col gap-2">
         <Button size="sm" onClick={newChat} className="w-full gap-2">
-          <Plus className="w-4 h-4" /> New Chat
+          <Plus className="w-4 h-4" /> {NEW_CHAT_LABELS[language] ?? "New Chat"}
         </Button>
         <ScrollArea className="flex-1">
           <div className="space-y-1">
             {sessions.map(s => (
-              <button
-                key={s.id}
-                onClick={() => loadSession(s.id)}
+              <button key={s.id} onClick={() => loadSession(s.id)}
                 className={cn(
                   "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors truncate",
                   sessionId === s.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-gray-100 text-gray-600"
-                )}
-              >
+                )}>
                 {s.title}
               </button>
             ))}
@@ -120,7 +126,6 @@ export default function ChatPage() {
 
       {/* Chat area */}
       <div className="flex-1 flex flex-col bg-white rounded-2xl border shadow-sm overflow-hidden">
-        {/* Header */}
         <div className="px-4 py-3 border-b flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-saffron-500 to-orange-600 rounded-full flex items-center justify-center">
             <Bot className="w-4 h-4 text-white" />
@@ -136,7 +141,6 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Messages */}
         <ScrollArea className="flex-1 px-4 py-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-12">
@@ -144,16 +148,12 @@ export default function ChatPage() {
                 <Bot className="w-8 h-8 text-saffron-500" />
               </div>
               <div>
-                <p className="font-semibold text-gray-700">Ask me anything</p>
+                <p className="font-semibold text-gray-700">{PLACEHOLDERS[language] ?? "Ask me anything"}</p>
                 <p className="text-sm text-muted-foreground mt-1 max-w-xs">
                   Business tips, farming advice, government schemes, finance — in your language.
                 </p>
               </div>
-              {[
-                "मुझे मुद्रा लोन कैसे मिलेगा?",
-                "My crop prices are low — what should I do?",
-                "How to start a small business with ₹10,000?",
-              ].map(s => (
+              {["मुझे मुद्रा लोन कैसे मिलेगा?", "My crop prices are low — what should I do?", "How to start a small business with ₹10,000?"].map(s => (
                 <button key={s} onClick={() => setInput(s)} className="block mt-2 text-xs text-primary hover:underline">
                   &ldquo;{s}&rdquo;
                 </button>
@@ -168,35 +168,22 @@ export default function ChatPage() {
 
           <AnimatePresence initial={false}>
             {messages.map((m, i) => (
-              <motion.div
-                key={m.id ?? i}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn("flex gap-2 mb-4", m.role === "user" ? "justify-end" : "justify-start")}
-              >
+              <motion.div key={m.id ?? i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                className={cn("flex gap-2 mb-4", m.role === "user" ? "justify-end" : "justify-start")}>
                 {m.role === "assistant" && (
                   <div className="w-7 h-7 bg-gradient-to-br from-saffron-500 to-orange-600 rounded-full flex items-center justify-center shrink-0 mt-0.5">
                     <Bot className="w-3.5 h-3.5 text-white" />
                   </div>
                 )}
                 <div className="flex flex-col gap-1 max-w-[75%]">
-                  <div className={cn(
-                    "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-                    m.role === "user"
-                      ? "bg-primary text-white rounded-tr-sm"
-                      : "bg-gray-100 text-gray-800 rounded-tl-sm"
-                  )}>
+                  <div className={cn("rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                    m.role === "user" ? "bg-primary text-white rounded-tr-sm" : "bg-gray-100 text-gray-800 rounded-tl-sm")}>
                     {m.content}
                   </div>
                   {m.role === "assistant" && isTTSSupported && (
-                    <button
-                      onClick={() => handleSpeak(m)}
-                      className="self-start text-xs text-muted-foreground hover:text-primary flex items-center gap-1 ml-1"
-                    >
-                      {speakingId === m.id
-                        ? <><VolumeX className="w-3 h-3" /> Stop</>
-                        : <><Volume2 className="w-3 h-3" /> Listen</>
-                      }
+                    <button onClick={() => handleSpeak(m)}
+                      className="self-start text-xs text-muted-foreground hover:text-primary flex items-center gap-1 ml-1">
+                      {speakingId === m.id ? <><VolumeX className="w-3 h-3" /> Stop</> : <><Volume2 className="w-3 h-3" /> Listen</>}
                     </button>
                   )}
                 </div>
@@ -222,24 +209,18 @@ export default function ChatPage() {
           <div ref={bottomRef} />
         </ScrollArea>
 
-        {/* Input */}
         <div className="px-4 py-3 border-t flex gap-2">
           <Input
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
-            placeholder={language === "Hindi" ? "अपना सवाल लिखें..." : "Ask your question..."}
+            placeholder={PLACEHOLDERS[language] ?? "Ask your question..."}
             className="flex-1"
             disabled={sendMutation.isPending}
           />
           {isSTTSupported && (
-            <Button
-              size="icon"
-              variant={isListening ? "default" : "ghost"}
-              onClick={handleMic}
-              className={cn("shrink-0", isListening && "bg-red-500 hover:bg-red-600 text-white")}
-              title={isListening ? "Stop recording" : "Speak your question"}
-            >
+            <Button size="icon" variant={isListening ? "default" : "ghost"} onClick={handleMic}
+              className={cn("shrink-0", isListening && "bg-red-500 hover:bg-red-600 text-white")}>
               {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-gray-400" />}
             </Button>
           )}
