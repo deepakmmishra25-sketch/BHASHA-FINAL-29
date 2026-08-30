@@ -35,7 +35,6 @@ Topics you can help with: business planning, farming advice, government schemes,
 
 
 def _get_ai_response(history, message: str) -> str:
-    """Generate AI response using Groq (free, fast, no quota issues)."""
     api_key = getattr(settings, "GROQ_API_KEY", None)
     if not api_key:
         return "🔑 GROQ_API_KEY is not configured. Please add it to your Railway environment variables."
@@ -66,10 +65,7 @@ def _get_ai_response(history, message: str) -> str:
         return f"I'm having trouble right now. Please try again. (Error: {str(e)[:100]})"
 
 
-# ── Background task helpers ───────────────────────────────────────────────────
-
 async def _record_chat_event(user_id: str, language: str) -> None:
-    """Record a chat analytics event in a dedicated session (non-blocking)."""
     async with AsyncSessionLocal() as session:
         try:
             session.add(UsageEvent(
@@ -82,8 +78,6 @@ async def _record_chat_event(user_id: str, language: str) -> None:
         except Exception:
             await session.rollback()
 
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/sessions")
 async def list_sessions(
@@ -107,7 +101,6 @@ async def send_message(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Get or create session
     session = None
     if data.session_id:
         result = await db.execute(
@@ -133,11 +126,9 @@ async def send_message(
         db.add(session)
         await db.flush()
 
-    # Store user message
     user_msg = ChatMessage(session_id=session.id, role="user", content=data.message, language=data.language)
     db.add(user_msg)
 
-    # Fetch recent history (last 10 messages)
     history_result = await db.execute(
         select(ChatMessage)
         .where(ChatMessage.session_id == session.id)
@@ -146,7 +137,6 @@ async def send_message(
     )
     history = list(reversed(history_result.scalars().all()))
 
-    # Generate AI response
     ai_text = _get_ai_response(history, data.message)
 
     ai_msg = ChatMessage(session_id=session.id, role="assistant", content=ai_text, language=data.language)
