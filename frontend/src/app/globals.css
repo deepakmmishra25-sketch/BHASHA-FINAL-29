@@ -27,24 +27,24 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --background: 224 20% 8%;
+    --foreground: 210 40% 95%;
+    --card: 224 20% 11%;
+    --card-foreground: 210 40% 95%;
+    --popover: 224 20% 11%;
+    --popover-foreground: 210 40% 95%;
     --primary: 24 100% 60%;
     --primary-foreground: 0 0% 100%;
     --secondary: 134 61% 35%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --muted: 224 20% 16%;
+    --muted-foreground: 215 20% 60%;
+    --accent: 224 20% 16%;
+    --accent-foreground: 210 40% 95%;
+    --destructive: 0 62.8% 40%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 224 20% 18%;
+    --input: 224 20% 16%;
     --ring: 24 100% 60%;
   }
 }
@@ -79,4 +79,14 @@ html {
 
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/50;
+}
+
+/* Dark mode glow effect on primary elements */
+.dark .glow {
+  box-shadow: 0 0 20px hsl(24 100% 60% / 0.15);
+}
+
+/* Smooth theme transition */
+*, *::before, *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
