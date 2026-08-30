@@ -30,9 +30,11 @@ export function isEnglish(language: string): boolean {
 interface AppState {
   language: string;
   sidebarOpen: boolean;
+  theme: "light" | "dark";
   setLanguage: (lang: string) => void;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
+  toggleTheme: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -40,14 +42,30 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       language: "English",
       sidebarOpen: true,
+      theme: "light",
       setLanguage: (language) => set({ language }),
       setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
       toggleSidebar: () =>
         set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+      toggleTheme: () =>
+        set((state) => {
+          const newTheme = state.theme === "light" ? "dark" : "light";
+          if (newTheme === "dark") {
+            document.documentElement.classList.add("dark");
+          } else {
+            document.documentElement.classList.remove("dark");
+          }
+          return { theme: newTheme };
+        }),
     }),
     {
       name: "bhashasetu-app",
-      partialize: (state) => ({ language: state.language }),
+      partialize: (state) => ({ language: state.language, theme: state.theme }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      },
     }
   )
 );
