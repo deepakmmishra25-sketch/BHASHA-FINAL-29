@@ -1,4 +1,4 @@
-"""AI Chat endpoints — Gemini-powered multilingual conversation."""
+"""AI Chat endpoints — Claude-powered multilingual conversation."""
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -21,17 +21,6 @@ class ChatInput(BaseModel):
     language: str = "English"
 
 
-def _get_gemini_client():
-    if not settings.GEMINI_API_KEY:
-        return None
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        return genai.GenerativeModel(settings.GEMINI_MODEL)
-    except Exception:
-        return None
-
-
 SYSTEM_PROMPT = """You are BhashaSetu AI — a friendly, knowledgeable business mentor and advisor for rural entrepreneurs, farmers, MSMEs, students, and small business owners in India.
 
 Key guidelines:
@@ -43,6 +32,49 @@ Key guidelines:
 - Keep responses concise but helpful (2-4 paragraphs max)
 
 Topics you can help with: business planning, farming advice, government schemes, digital payments, marketing, finance, legal basics, skill development."""
+
+
+def _get_ai_response(history: list, message: str) -> str:
+    """Generate AI response using Claude (Anthropic)."""
+    api_key = getattr(settings, "ANTHROPIC_API_KEY", None)
+    if not api_key:
+        return (
+            "🔑 ANTHROPIC_API_KEY is not configured. "
+            "Please add it to your Railway environment variables to enable AI responses."
+        )
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=api_key)
+
+        # Build messages list from history — Claude requires alternating user/assistant roles
+        msgs = []
+        for m in history:
+            role = "user" if m.role == "user" else "assistant"
+            msgs.append({"role": role, "content": m.content})
+
+        # Append the current user message
+        msgs.append({"role": "user", "content": message})
+
+        # Ensure messages alternate properly (Claude strict requirement)
+        # If two consecutive messages have the same role, merge them
+        merged = []
+        for msg in msgs:
+            if merged and merged[-1]["role"] == msg["role"]:
+                merged[-1]["content"] += "\n" + msg["content"]
+            else:
+                merged.append(msg)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            messages=merged,
+        )
+        return response.content[0].text
+
+    except Exception as e:
+        return f"I'm having trouble connecting to the AI service right now. Please try again in a moment. (Error: {str(e)[:100]})"
 
 
 # ── Background task helpers ───────────────────────────────────────────────────
@@ -126,25 +158,8 @@ async def send_message(
     )
     history = list(reversed(history_result.scalars().all()))
 
-    # Generate AI response
-    model = _get_gemini_client()
-    if model:
-        try:
-            history_text = "\n".join(
-                f"{'User' if m.role == 'user' else 'Assistant'}: {m.content}"
-                for m in history
-            )
-            prompt = f"{SYSTEM_PROMPT}\n\nConversation so far:\n{history_text}\nUser: {data.message}\nAssistant:"
-            response = model.generate_content(prompt)
-            ai_text = response.text
-        except Exception as e:
-            ai_text = f"I'm having trouble connecting to the AI service right now. Please try again in a moment. (Error: {str(e)[:100]})"
-    else:
-        ai_text = (
-            "🔑 The Gemini API key is not configured. "
-            "Please add GEMINI_API_KEY to your environment secrets to enable AI responses. "
-            "Once configured, I'll be able to answer your questions in 13 Indian languages!"
-        )
+    # Generate AI response using Claude
+    ai_text = _get_ai_response(history, data.message)
 
     ai_msg = ChatMessage(session_id=session.id, role="assistant", content=ai_text, language=data.language)
     db.add(ai_msg)
