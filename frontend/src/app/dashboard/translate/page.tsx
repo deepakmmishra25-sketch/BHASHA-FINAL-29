@@ -6,10 +6,12 @@ import { ArrowLeftRight, Copy, Loader2, Languages } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SUPPORTED_LANGUAGES } from "@/store/app.store";
+import { SUPPORTED_LANGUAGES, useAppStore } from "@/store/app.store";
+import { t } from "@/lib/translations";
 import apiClient from "@/lib/api";
 
 export default function TranslatePage() {
+  const { language } = useAppStore();
   const [sourceText, setSourceText] = useState("");
   const [targetLang, setTargetLang] = useState("Hindi");
   const [result, setResult] = useState("");
@@ -27,15 +29,14 @@ export default function TranslatePage() {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Languages className="w-6 h-6 text-primary" /> Translate
+          <Languages className="w-6 h-6 text-primary" /> {t(language, "translateTitle")}
         </h1>
-        <p className="text-muted-foreground text-sm mt-1">Translate any text into 13 Indian languages</p>
+        <p className="text-muted-foreground text-sm mt-1">{t(language, "translateSubtitle")}</p>
       </div>
 
       <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-        {/* Language selector */}
         <div className="flex items-center gap-3 px-4 py-3 border-b bg-gray-50">
-          <span className="text-sm text-muted-foreground">Auto-detect</span>
+          <span className="text-sm text-muted-foreground">{t(language, "autoDetect")}</span>
           <button onClick={swap} className="p-1.5 rounded-md hover:bg-gray-200 transition-colors">
             <ArrowLeftRight className="w-4 h-4 text-gray-500" />
           </button>
@@ -55,15 +56,15 @@ export default function TranslatePage() {
           <div className="p-4">
             <textarea
               className="w-full h-48 text-sm resize-none outline-none placeholder:text-muted-foreground"
-              placeholder="Enter text to translate..."
+              placeholder={t(language, "enterText")}
               value={sourceText}
               onChange={e => setSourceText(e.target.value)}
             />
             <div className="flex justify-between items-center mt-2">
-              <span className="text-xs text-muted-foreground">{sourceText.length} chars</span>
+              <span className="text-xs text-muted-foreground">{sourceText.length} {t(language, "chars")}</span>
               <Button size="sm" onClick={() => mutation.mutate()} disabled={!sourceText.trim() || mutation.isPending}>
                 {mutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : null}
-                Translate
+                {t(language, "translateBtn")}
               </Button>
             </div>
           </div>
@@ -72,9 +73,9 @@ export default function TranslatePage() {
             <div className="w-full h-48 text-sm text-gray-700 overflow-y-auto leading-relaxed">
               {mutation.isPending ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Translating...
+                  <Loader2 className="w-4 h-4 animate-spin" /> {t(language, "translating")}
                 </div>
-              ) : result || <span className="text-muted-foreground">Translation will appear here</span>}
+              ) : result || <span className="text-muted-foreground">{t(language, "translationHere")}</span>}
             </div>
             {result && (
               <button onClick={copy} className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-gray-200 transition-colors">
