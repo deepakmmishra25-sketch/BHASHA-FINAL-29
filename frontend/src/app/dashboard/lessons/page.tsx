@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Clock, CheckCircle, ChevronRight, X, Play } from "lucide-react";
 import { toast } from "sonner";
+import { useAppStore } from "@/store/app.store";
+import { t } from "@/lib/translations";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAppStore } from "@/store/app.store";
