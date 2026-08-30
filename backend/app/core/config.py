@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     # ── AI ─────────────────────────────────────────────────────────────
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.0-flash"
+    GROQ_API_KEY: str = ""
 
     # ── Logging ────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
