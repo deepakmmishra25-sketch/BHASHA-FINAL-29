@@ -41,21 +41,7 @@ def _get_gemini_client():
     try:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        for model_name in [
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash-lite",
-            "gemini-1.5-flash-8b",
-            "gemini-1.5-flash",
-            "gemini-pro",
-        ]:
-            try:
-                model = genai.GenerativeModel(model_name)
-                model.generate_content("hi")
-                return model
-            except Exception:
-                continue
-        return None
+        return genai.GenerativeModel("models/gemini-2.5-flash-lite")
     except Exception:
         return None
 
@@ -81,7 +67,7 @@ async def _record_chat_event(user_id: str, language: str) -> None:
 
 @router.get("/models")
 async def list_models():
-    """Temporary debug endpoint — shows available Gemini models. Remove after testing."""
+    """Debug endpoint — shows available Gemini models. Remove after testing."""
     try:
         import google.generativeai as genai
         genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -143,4 +129,62 @@ async def send_message(
     user_msg = ChatMessage(session_id=session.id, role="user", content=data.message, language=data.language)
     db.add(user_msg)
 
-    # Fetch recent history (last 10
+    # Fetch recent history (last 10 messages)
+    history_result = await db.execute(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session.id)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(10)
+    )
+    history = list(reversed(history_result.scalars().all()))
+
+    # Generate AI response
+    model = _get_gemini_client()
+    if model:
+        try:
+            history_text = "\n".join(
+                f"{'User' if m.role == 'user' else 'Assistant'}: {m.content}"
+                for m in history
+            )
+            prompt = f"{SYSTEM_PROMPT}\n\nConversation so far:\n{history_text}\nUser: {data.message}\nAssistant:"
+            response = model.generate_content(prompt)
+            ai_text = response.text
+        except Exception as e:
+            ai_text = f"I'm having trouble right now. Please try again. (Error: {str(e)[:100]})"
+    else:
+        ai_text = "🔑 GEMINI_API_KEY is not configured. Please check your Railway environment variables."
+
+    ai_msg = ChatMessage(session_id=session.id, role="assistant", content=ai_text, language=data.language)
+    db.add(ai_msg)
+
+    if is_first_chat:
+        from app.services.notification_service import notify_first_chat
+        await notify_first_chat(db, current_user.id, current_user.language or "English")
+
+    await db.commit()
+
+    background_tasks.add_task(_record_chat_event, current_user.id, data.language)
+
+    return {
+        "sessionId": session.id,
+        "userMessage": {"id": user_msg.id, "role": "user", "content": data.message},
+        "aiMessage": {"id": ai_msg.id, "role": "assistant", "content": ai_text},
+    }
+
+
+@router.get("/sessions/{session_id}/messages")
+async def get_messages(
+    session_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    msgs = await db.execute(
+        select(ChatMessage).where(ChatMessage.session_id == session_id).order_by(ChatMessage.created_at)
+    )
+    return [{"id": m.id, "role": m.role, "content": m.content, "createdAt": m.created_at.isoformat()} for m in msgs.scalars().all()]
