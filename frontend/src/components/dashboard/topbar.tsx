@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, Sun, Moon } from "lucide-react";
 import { useAuthStore } from "@/store/auth.store";
 import { useAppStore, SUPPORTED_LANGUAGES } from "@/store/app.store";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,10 +10,10 @@ import { t } from "@/lib/translations";
 
 export function TopBar() {
   const { user } = useAuthStore();
-  const { language, setLanguage } = useAppStore();
+  const { language, setLanguage, theme, toggleTheme } = useAppStore();
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center gap-4 px-6 shrink-0">
+    <header className="h-16 bg-white dark:bg-card border-b border-gray-200 dark:border-border flex items-center gap-4 px-6 shrink-0">
       <div className="flex-1 max-w-sm">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -38,8 +38,21 @@ export function TopBar() {
           </SelectContent>
         </Select>
 
-        <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
-          <Bell className="w-4 h-4 text-gray-600" />
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleTheme}
+          className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-muted transition-colors"
+          title={theme === "dark" ? "Switch to Light" : "Switch to Dark"}
+        >
+          {theme === "dark" ? (
+            <Sun className="w-4 h-4 text-yellow-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-gray-600" />
+          )}
+        </button>
+
+        <button className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-muted transition-colors">
+          <Bell className="w-4 h-4 text-gray-600 dark:text-gray-300" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
         </button>
 
