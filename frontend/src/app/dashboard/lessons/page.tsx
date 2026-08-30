@@ -27,6 +27,7 @@ interface Lesson {
   title: string;
   titleHindi?: string;
   description: string;
+  descriptionHindi?: string;
   level: string;
   durationMinutes: number;
   completed: boolean;
@@ -39,6 +40,26 @@ const LEVEL_COLOR: Record<string, string> = {
   intermediate: "bg-yellow-100 text-yellow-700",
   advanced: "bg-red-100 text-red-700",
 };
+
+const LEVEL_LABELS: Record<string, Record<string, string>> = {
+  English:   { beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" },
+  Hindi:     { beginner: "शुरुआती", intermediate: "मध्यम", advanced: "उन्नत" },
+  Marathi:   { beginner: "प्रारंभिक", intermediate: "मध्यम", advanced: "प्रगत" },
+  Gujarati:  { beginner: "શરૂઆત", intermediate: "મધ્યમ", advanced: "અદ્યતન" },
+  Tamil:     { beginner: "தொடக்கநிலை", intermediate: "இடைநிலை", advanced: "மேம்பட்ட" },
+  Telugu:    { beginner: "ప్రారంభ", intermediate: "మధ్యమ", advanced: "అధునాతన" },
+  Kannada:   { beginner: "ಆರಂಭಿಕ", intermediate: "ಮಧ್ಯಮ", advanced: "ಸುಧಾರಿತ" },
+  Malayalam: { beginner: "തുടക്കക്കാർ", intermediate: "ഇടക്കാൽ", advanced: "വിദഗ്ദ്ധ" },
+  Punjabi:   { beginner: "ਸ਼ੁਰੂਆਤੀ", intermediate: "ਦਰਮਿਆਨੀ", advanced: "ਉੱਨਤ" },
+  Bengali:   { beginner: "প্রাথমিক", intermediate: "মধ্যবর্তী", advanced: "উন্নত" },
+  Urdu:      { beginner: "ابتدائی", intermediate: "درمیانی", advanced: "اعلی" },
+  Odia:      { beginner: "ଆରମ୍ଭିକ", intermediate: "ମଧ୍ୟବର୍ତ୍ତୀ", advanced: "ଉନ୍ନତ" },
+  Assamese:  { beginner: "আৰম্ভণিক", intermediate: "মধ্যবৰ্তী", advanced: "উন্নত" },
+};
+
+function getLevelLabel(language: string, level: string): string {
+  return LEVEL_LABELS[language]?.[level] ?? level;
+}
 
 function getYouTubeEmbedUrl(url: string): string | null {
   try {
@@ -70,9 +91,11 @@ function getYouTubeThumbnail(url: string): string | null {
 
 function WatchTimer({
   durationMinutes,
+  language,
   onComplete,
 }: {
   durationMinutes: number;
+  language: string;
   onComplete: () => void;
 }) {
   const [seconds, setSeconds] = useState(0);
@@ -95,14 +118,14 @@ function WatchTimer({
               style={{ width: `${percent}%` }}
             />
           </div>
-          <span>{percent}% watched</span>
+          <span>{percent}{t(language, "watched")}</span>
         </div>
       ) : (
         <button
           onClick={onComplete}
           className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
         >
-          Mark as Complete <ChevronRight className="w-3 h-3" />
+          {t(language, "markComplete")} <ChevronRight className="w-3 h-3" />
         </button>
       )}
     </div>
@@ -111,7 +134,7 @@ function WatchTimer({
 
 export default function LessonsPage() {
   const { language } = useAppStore();
-  const isHindi = language === "Hindi";
+  const isNonEnglish = language !== "English";
   const qc = useQueryClient();
   const [activeCategory, setActiveCategory] = useState<number | undefined>();
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
@@ -133,7 +156,7 @@ export default function LessonsPage() {
     mutationFn: (id: number) => apiClient.post(`/lessons/${id}/complete`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["lessons"] });
-      toast.success("Lesson completed! 🎉");
+      toast.success(t(language, "completed") + "! 🎉");
       setSelectedLesson(null);
     },
   });
@@ -145,11 +168,9 @@ export default function LessonsPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       <div>
-        <h1 className="text-2xl font-bold">{isHindi ? "सीखें" : "Learn"}</h1>
+        <h1 className="text-2xl font-bold">{t(language, "learn")}</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          {isHindi
-            ? "अपनी गति से, अपनी भाषा में सीखें"
-            : "Learn at your own pace, in your language"}
+          {t(language, "learnDesc")}
         </p>
       </div>
 
@@ -163,7 +184,7 @@ export default function LessonsPage() {
               : "bg-gray-100 text-gray-600 hover:bg-gray-200"
           )}
         >
-          All
+          {t(language, "all")}
         </button>
         {categories.map((c) => (
           <button
@@ -176,7 +197,7 @@ export default function LessonsPage() {
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             )}
           >
-            {isHindi && c.nameHindi ? c.nameHindi : c.name}
+            {isNonEnglish && c.nameHindi ? c.nameHindi : c.name}
           </button>
         ))}
       </div>
@@ -190,7 +211,7 @@ export default function LessonsPage() {
       ) : lessons.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p>{isHindi ? "कोई पाठ नहीं मिला" : "No lessons found"}</p>
+          <p>{t(language, "noLessons")}</p>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -230,22 +251,19 @@ export default function LessonsPage() {
                     <div className="flex items-start justify-between mb-2">
                       <Badge
                         variant="outline"
-                        className={cn(
-                          "text-xs font-medium",
-                          LEVEL_COLOR[l.level]
-                        )}
+                        className={cn("text-xs font-medium", LEVEL_COLOR[l.level])}
                       >
-                        {l.level}
+                        {getLevelLabel(language, l.level)}
                       </Badge>
                       {l.completed && (
                         <CheckCircle className="w-4 h-4 text-green-500" />
                       )}
                     </div>
                     <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
-                      {isHindi && l.titleHindi ? l.titleHindi : l.title}
+                      {isNonEnglish && l.titleHindi ? l.titleHindi : l.title}
                     </h3>
                     <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
-                      {l.description}
+                      {isNonEnglish && l.descriptionHindi ? l.descriptionHindi : l.description}
                     </p>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -287,7 +305,7 @@ export default function LessonsPage() {
                 </div>
               ) : (
                 <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-muted-foreground text-sm">
-                  No video available for this lesson
+                  {t(language, "noLessons")}
                 </div>
               )}
 
@@ -295,12 +313,14 @@ export default function LessonsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="font-bold text-lg text-gray-900">
-                      {isHindi && selectedLesson.titleHindi
+                      {isNonEnglish && selectedLesson.titleHindi
                         ? selectedLesson.titleHindi
                         : selectedLesson.title}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {selectedLesson.description}
+                      {isNonEnglish && selectedLesson.descriptionHindi
+                        ? selectedLesson.descriptionHindi
+                        : selectedLesson.description}
                     </p>
                   </div>
                   <button
@@ -313,23 +333,21 @@ export default function LessonsPage() {
                 <div className="flex items-center gap-3 mt-4">
                   <Badge
                     variant="outline"
-                    className={cn(
-                      "text-xs font-medium",
-                      LEVEL_COLOR[selectedLesson.level]
-                    )}
+                    className={cn("text-xs font-medium", LEVEL_COLOR[selectedLesson.level])}
                   >
-                    {selectedLesson.level}
+                    {getLevelLabel(language, selectedLesson.level)}
                   </Badge>
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="w-3 h-3" /> {selectedLesson.durationMinutes} min
                   </span>
                   {selectedLesson.completed ? (
                     <span className="ml-auto flex items-center gap-1 text-sm text-green-600 font-medium">
-                      <CheckCircle className="w-4 h-4" /> Completed
+                      <CheckCircle className="w-4 h-4" /> {t(language, "completed")}
                     </span>
                   ) : (
                     <WatchTimer
                       durationMinutes={selectedLesson.durationMinutes}
+                      language={language}
                       onComplete={() => completeMutation.mutate(selectedLesson.id)}
                     />
                   )}
