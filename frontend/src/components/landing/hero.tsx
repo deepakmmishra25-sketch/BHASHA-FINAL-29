@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowRight, Mic, Languages, Sparkles, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAppStore, SUPPORTED_LANGUAGES } from "@/store/app.store";
+import { t } from "@/lib/translations";
 
 const floatingLanguages = [
   { text: "नमस्ते", lang: "Hindi", color: "bg-orange-100 text-orange-700" },
@@ -16,26 +18,49 @@ const floatingLanguages = [
 ];
 
 export function Hero() {
+  const { language, setLanguage } = useAppStore();
+
   return (
     <section className="relative min-h-screen flex items-center pt-16 overflow-hidden bg-gradient-to-br from-orange-50 via-white to-green-50">
-      {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-saffron-100 rounded-full blur-3xl opacity-40" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-green-100 rounded-full blur-3xl opacity-40" />
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        {/* Language Selector */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="mb-10"
+        >
+          <p className="text-sm font-medium text-gray-500 mb-3 text-center">
+            {t(language, "selectLang")} 👇
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => setLanguage(lang.name)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                  language === lang.name
+                    ? "bg-primary text-white border-primary shadow-md scale-105"
+                    : "bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary"
+                }`}
+              >
+                {lang.native}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left — copy */}
           <div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <Badge variant="outline" className="mb-6 border-saffron-200 text-saffron-700 bg-saffron-50">
                 <Sparkles className="w-3 h-3 mr-1" />
-                India's #1 Multilingual AI Platform
+                {t(language, "badge")}
               </Badge>
             </motion.div>
 
@@ -45,9 +70,9 @@ export function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
             >
-              Grow Your Business in{" "}
+              {t(language, "heroTitle1")}{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-saffron-500 to-orange-600">
-                Your Language
+                {t(language, "heroTitle2")}
               </span>
             </motion.h1>
 
@@ -57,7 +82,7 @@ export function Hero() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
-              BhashaSetu AI helps farmers, MSMEs, rural entrepreneurs, and students access AI-powered mentorship, government schemes, and business tools — in 13 Indian languages.
+              {t(language, "heroDesc")}
             </motion.p>
 
             <motion.div
@@ -68,14 +93,14 @@ export function Hero() {
             >
               <Button size="xl" asChild className="group">
                 <Link href="/register">
-                  Start for Free
+                  {t(language, "startFree")}
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
               <Button size="xl" variant="outline" asChild>
                 <Link href="#demo">
                   <Mic className="w-4 h-4 mr-2" />
-                  Try Voice Demo
+                  {t(language, "tryVoice")}
                 </Link>
               </Button>
             </motion.div>
@@ -92,22 +117,20 @@ export function Hero() {
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 </div>
-                Free forever plan
+                {t(language, "freePlan")}
               </div>
               <div className="flex items-center gap-1.5">
                 <Languages className="w-4 h-4 text-primary" />
-                13 Indian languages
+                {t(language, "indianLangs")}
               </div>
               <div className="flex items-center gap-1.5">
                 <Mic className="w-4 h-4 text-primary" />
-                Voice-first AI
+                {t(language, "voiceFirst")}
               </div>
             </motion.div>
           </div>
 
-          {/* Right — floating language cards */}
           <div className="relative hidden lg:flex items-center justify-center h-[480px]">
-            {/* Central orb */}
             <motion.div
               className="absolute w-32 h-32 rounded-full bg-gradient-to-br from-saffron-400 to-orange-500 shadow-2xl flex items-center justify-center z-10"
               animate={{ scale: [1, 1.05, 1] }}
@@ -116,7 +139,6 @@ export function Hero() {
               <Globe className="w-12 h-12 text-white" />
             </motion.div>
 
-            {/* Language pills orbiting */}
             {floatingLanguages.map((item, i) => {
               const angle = (i / floatingLanguages.length) * 360;
               const rad = (angle * Math.PI) / 180;
@@ -138,13 +160,10 @@ export function Hero() {
                 </motion.div>
               );
             })}
-
-            {/* Dashed orbit ring */}
             <div className="absolute w-[380px] h-[380px] rounded-full border-2 border-dashed border-saffron-200 opacity-40" />
           </div>
         </div>
 
-        {/* Stats bar */}
         <motion.div
           className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-6 p-6 bg-white/60 backdrop-blur-sm rounded-2xl border border-white shadow-lg"
           initial={{ opacity: 0, y: 30 }}
@@ -152,14 +171,14 @@ export function Hero() {
           transition={{ duration: 0.6, delay: 0.6 }}
         >
           {[
-            { value: "13", label: "Indian Languages" },
-            { value: "50K+", label: "Entrepreneurs Helped" },
-            { value: "200+", label: "Govt. Schemes" },
-            { value: "4.9★", label: "User Rating" },
+            { value: "13", key: "stat1" },
+            { value: "50K+", key: "stat2" },
+            { value: "200+", key: "stat3" },
+            { value: "4.9★", key: "stat4" },
           ].map((stat) => (
-            <div key={stat.label} className="text-center">
+            <div key={stat.key} className="text-center">
               <div className="text-2xl sm:text-3xl font-bold text-primary">{stat.value}</div>
-              <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
+              <div className="text-sm text-muted-foreground mt-1">{t(language, stat.key as any)}</div>
             </div>
           ))}
         </motion.div>
