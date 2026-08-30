@@ -41,7 +41,7 @@ def _get_gemini_client():
     try:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        return genai.GenerativeModel("models/gemini-2.5-flash-lite")
+        return genai.GenerativeModel("models/gemini-2.5-flash")
     except Exception:
         return None
 
