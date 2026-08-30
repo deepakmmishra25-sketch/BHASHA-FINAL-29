@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { BookOpen, Clock, CheckCircle, ChevronRight, X, Play } from "lucide-react";
@@ -67,6 +67,47 @@ function getYouTubeThumbnail(url: string): string | null {
   }
 }
 
+function WatchTimer({
+  durationMinutes,
+  onComplete,
+}: {
+  durationMinutes: number;
+  onComplete: () => void;
+}) {
+  const [seconds, setSeconds] = useState(0);
+  const required = Math.floor(durationMinutes * 60 * 0.8);
+  const ready = seconds >= required;
+  const percent = Math.min(100, Math.floor((seconds / required) * 100));
+
+  useEffect(() => {
+    const interval = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="ml-auto flex items-center gap-2">
+      {!ready ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <span>{percent}% watched</span>
+        </div>
+      ) : (
+        <button
+          onClick={onComplete}
+          className="text-sm text-primary font-medium hover:underline flex items-center gap-1"
+        >
+          Mark as Complete <ChevronRight className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function LessonsPage() {
   const { language } = useAppStore();
   const isHindi = language === "Hindi";
@@ -92,6 +133,7 @@ export default function LessonsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["lessons"] });
       toast.success("Lesson completed! 🎉");
+      setSelectedLesson(null);
     },
   });
 
@@ -152,7 +194,9 @@ export default function LessonsPage() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {lessons.map((l, i) => {
-            const thumbnail = l.youtubeUrl ? getYouTubeThumbnail(l.youtubeUrl) : null;
+            const thumbnail = l.youtubeUrl
+              ? getYouTubeThumbnail(l.youtubeUrl)
+              : null;
             return (
               <motion.div
                 key={l.id}
@@ -181,16 +225,20 @@ export default function LessonsPage() {
                       </div>
                     </div>
                   )}
-
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-start justify-between mb-2">
                       <Badge
                         variant="outline"
-                        className={cn("text-xs font-medium", LEVEL_COLOR[l.level])}
+                        className={cn(
+                          "text-xs font-medium",
+                          LEVEL_COLOR[l.level]
+                        )}
                       >
                         {l.level}
                       </Badge>
-                      {l.completed && <CheckCircle className="w-4 h-4 text-green-500" />}
+                      {l.completed && (
+                        <CheckCircle className="w-4 h-4 text-green-500" />
+                      )}
                     </div>
                     <h3 className="font-semibold text-gray-900 mb-1 line-clamp-2">
                       {isHindi && l.titleHindi ? l.titleHindi : l.title}
@@ -202,17 +250,6 @@ export default function LessonsPage() {
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" /> {l.durationMinutes} min
                       </div>
-                      {!l.completed && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            completeMutation.mutate(l.id);
-                          }}
-                          className="text-xs text-primary font-medium hover:underline flex items-center gap-0.5"
-                        >
-                          Complete <ChevronRight className="w-3 h-3" />
-                        </button>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -275,28 +312,25 @@ export default function LessonsPage() {
                 <div className="flex items-center gap-3 mt-4">
                   <Badge
                     variant="outline"
-                    className={cn("text-xs font-medium", LEVEL_COLOR[selectedLesson.level])}
+                    className={cn(
+                      "text-xs font-medium",
+                      LEVEL_COLOR[selectedLesson.level]
+                    )}
                   >
                     {selectedLesson.level}
                   </Badge>
                   <span className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="w-3 h-3" /> {selectedLesson.durationMinutes} min
                   </span>
-                  {!selectedLesson.completed && (
-                    <button
-                      onClick={() => {
-                        completeMutation.mutate(selectedLesson.id);
-                        setSelectedLesson(null);
-                      }}
-                      className="ml-auto text-sm text-primary font-medium hover:underline flex items-center gap-1"
-                    >
-                      Mark as Complete <ChevronRight className="w-3 h-3" />
-                    </button>
-                  )}
-                  {selectedLesson.completed && (
+                  {selectedLesson.completed ? (
                     <span className="ml-auto flex items-center gap-1 text-sm text-green-600 font-medium">
                       <CheckCircle className="w-4 h-4" /> Completed
                     </span>
+                  ) : (
+                    <WatchTimer
+                      durationMinutes={selectedLesson.durationMinutes}
+                      onComplete={() => completeMutation.mutate(selectedLesson.id)}
+                    />
                   )}
                 </div>
               </div>
