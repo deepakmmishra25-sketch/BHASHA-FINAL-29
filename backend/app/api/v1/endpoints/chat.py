@@ -53,7 +53,7 @@ def _get_ai_response(history, message: str) -> str:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "llama-3.1-8b-instant",
+                "model": "llama3-8b-8192",
                 "messages": msgs,
                 "max_tokens": 1024,
             },
