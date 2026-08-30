@@ -79,6 +79,22 @@ async def _record_chat_event(user_id: str, language: str) -> None:
             await session.rollback()
 
 
+@router.get("/test-groq")
+async def test_groq():
+    import httpx
+    api_key = getattr(settings, "GROQ_API_KEY", None)
+    try:
+        r = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": "llama3-8b-8192", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 10},
+            timeout=30,
+        )
+        return {"status": r.status_code, "response": r.json()}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @router.get("/sessions")
 async def list_sessions(
     current_user: User = Depends(get_current_active_user),
