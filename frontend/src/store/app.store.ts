@@ -17,6 +17,16 @@ export const SUPPORTED_LANGUAGES = [
   { code: "as", name: "Assamese", native: "অসমীয়া" },
 ] as const;
 
+export type LanguageName = typeof SUPPORTED_LANGUAGES[number]["name"];
+
+export function getLangCode(name: string): string {
+  return SUPPORTED_LANGUAGES.find((l) => l.name === name)?.code ?? "en";
+}
+
+export function isEnglish(language: string): boolean {
+  return language === "English";
+}
+
 interface AppState {
   language: string;
   sidebarOpen: boolean;
