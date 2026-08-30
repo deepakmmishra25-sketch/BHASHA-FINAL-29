@@ -34,7 +34,7 @@ Key guidelines:
 Topics you can help with: business planning, farming advice, government schemes, digital payments, marketing, finance, legal basics, skill development."""
 
 
-def _get_ai_response(history, message: str) -> str:
+def _get_ai_response(history, message: str, language: str = "English") -> str:
     api_key = getattr(settings, "GROQ_API_KEY", None)
     if not api_key:
         return "🔑 GROQ_API_KEY is not configured. Please add it to your Railway environment variables."
@@ -42,7 +42,7 @@ def _get_ai_response(history, message: str) -> str:
         import httpx
 
         msgs = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": SYSTEM_PROMPT + f"\n\nIMPORTANT: The user has selected {language} as their language. You MUST respond in {language} only, regardless of what language the user writes in."},
             {"role": "user", "content": message},
         ]
 
@@ -77,22 +77,6 @@ async def _record_chat_event(user_id: str, language: str) -> None:
             await session.commit()
         except Exception:
             await session.rollback()
-
-
-@router.get("/test-groq")
-async def test_groq():
-    import httpx
-    api_key = getattr(settings, "GROQ_API_KEY", None)
-    try:
-        r = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "openai/gpt-oss-20b", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 10},
-            timeout=30,
-        )
-        return {"status": r.status_code, "response": r.json()}
-    except Exception as e:
-        return {"error": str(e)}
 
 
 @router.get("/sessions")
@@ -153,7 +137,7 @@ async def send_message(
     )
     history = list(reversed(history_result.scalars().all()))
 
-    ai_text = _get_ai_response(history, data.message)
+    ai_text = _get_ai_response(history, data.message, data.language)
 
     ai_msg = ChatMessage(session_id=session.id, role="assistant", content=ai_text, language=data.language)
     db.add(ai_msg)
