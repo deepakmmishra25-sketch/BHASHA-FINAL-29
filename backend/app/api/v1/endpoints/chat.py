@@ -53,7 +53,7 @@ def _get_ai_response(history, message: str) -> str:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "gemma2-9b-it",
+                "model": "openai/gpt-oss-20b",
                 "messages": msgs,
                 "max_tokens": 1024,
             },
@@ -87,7 +87,7 @@ async def test_groq():
         r = httpx.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "gemma2-9b-it", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 10},
+            json={"model": "openai/gpt-oss-20b", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 10},
             timeout=30,
         )
         return {"status": r.status_code, "response": r.json()}
