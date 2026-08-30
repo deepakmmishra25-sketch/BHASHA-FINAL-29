@@ -41,10 +41,10 @@ def _get_ai_response(history, message: str) -> str:
     try:
         import httpx
 
-        msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
-        for m in history:
-            msgs.append({"role": m.role, "content": m.content})
-        msgs.append({"role": "user", "content": message})
+        msgs = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": message},
+        ]
 
         r = httpx.post(
             "https://api.groq.com/openai/v1/chat/completions",
