@@ -29,7 +29,6 @@ SUPPORTED_LANGUAGES = [
     "Assamese",
 ]
 
-
 MAX_PDF_SIZE = 10 * 1024 * 1024
 CHUNK_SIZE = 10000
 
@@ -53,7 +52,7 @@ def get_groq_client():
 
 
 def translate_text(client, text: str, target_language: str) -> str:
-    """Translate a single text chunk using Groq."""
+    """Translate text using Groq."""
 
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
@@ -61,12 +60,11 @@ def translate_text(client, text: str, target_language: str) -> str:
             {
                 "role": "system",
                 "content": (
-                    "You are a professional document translator. "
-                    f"Translate the given text to {target_language}. "
+                    "You are a professional translator. "
+                    f"Translate the following text to {target_language}. "
                     "Return ONLY the translated text. "
-                    "Do not add explanations, notes, comments, "
-                    "or the original text. "
-                    "Preserve paragraph structure as much as possible."
+                    "Do not add explanations, notes, or the original text. "
+                    "Preserve paragraphs and basic structure."
                 ),
             },
             {
@@ -82,7 +80,7 @@ def translate_text(client, text: str, target_language: str) -> str:
 
 
 def split_text(text: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
-    """Split long text into reasonably sized chunks."""
+    """Split long PDF text into smaller chunks."""
 
     paragraphs = re.split(r"\n\s*\n", text)
 
@@ -107,7 +105,6 @@ def split_text(text: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
             if current:
                 chunks.append(current)
 
-            # Handle a single very large paragraph.
             if len(paragraph) > chunk_size:
                 for i in range(0, len(paragraph), chunk_size):
                     chunks.append(paragraph[i:i + chunk_size])
@@ -122,7 +119,7 @@ def split_text(text: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
 
 
 # ============================================================
-# Existing text translation endpoint
+# NORMAL TEXT TRANSLATION
 # ============================================================
 
 @router.post("")
@@ -155,7 +152,7 @@ async def translate(
 
 
 # ============================================================
-# PDF translation endpoint
+# PDF TRANSLATION
 # ============================================================
 
 @router.post("/pdf")
@@ -164,26 +161,12 @@ async def translate_pdf(
     target_language: str = "Hindi",
     _: User = Depends(get_current_active_user),
 ):
-    """
-    Upload a text-based PDF, extract its text, translate it,
-    and return a new translated PDF.
-
-    Note:
-    Scanned/image-only PDFs require OCR and are handled separately.
-    """
+    """Extract text from a PDF, translate it, and return a new PDF."""
 
     if file.content_type != "application/pdf":
         raise HTTPException(
             status_code=400,
             detail="Only PDF files are supported.",
-        )
-
-    content = await file.read()
-
-    if len(content) > MAX_PDF_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail="File too large. Maximum PDF size is 10MB.",
         )
 
     if target_language not in SUPPORTED_LANGUAGES:
@@ -192,7 +175,19 @@ async def translate_pdf(
             detail=f"Unsupported language: {target_language}",
         )
 
+    content = await file.read()
+
+    if len(content) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="File too large. Maximum size is 10MB.",
+        )
+
     try:
+        # ----------------------------------------------------
+        # Extract PDF text
+        # ----------------------------------------------------
+
         import pypdf
 
         reader = pypdf.PdfReader(io.BytesIO(content))
@@ -200,10 +195,10 @@ async def translate_pdf(
         pages = []
 
         for page in reader.pages:
-            page_text = page.extract_text() or ""
+            text = page.extract_text() or ""
 
-            if page_text.strip():
-                pages.append(page_text.strip())
+            if text.strip():
+                pages.append(text.strip())
 
         original_text = "\n\n".join(pages).strip()
 
@@ -211,50 +206,46 @@ async def translate_pdf(
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "No selectable text was found in this PDF. "
-                    "This appears to be a scanned/image PDF. "
+                    "No selectable text found in this PDF. "
+                    "This appears to be a scanned PDF. "
                     "Please use OCR for scanned documents."
                 ),
             )
 
         # ----------------------------------------------------
-        # Translate in chunks
+        # Translate
         # ----------------------------------------------------
 
-        chunks = split_text(original_text)
-
-        if not chunks:
-            raise HTTPException(
-                status_code=400,
-                detail="No readable text found in PDF.",
-            )
-
         client = get_groq_client()
+
+        chunks = split_text(original_text)
 
         translated_chunks = []
 
         for chunk in chunks:
-            translated_chunk = translate_text(
+            translated = translate_text(
                 client,
                 chunk,
                 target_language,
             )
 
-            translated_chunks.append(translated_chunk)
+            translated_chunks.append(translated)
 
         translated_text = "\n\n".join(translated_chunks)
 
         # ----------------------------------------------------
-        # Generate PDF
+        # Create PDF
         # ----------------------------------------------------
 
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.enums import TA_LEFT
-        from reportlab.lib.colors import black
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import (
+            ParagraphStyle,
+            getSampleStyleSheet,
+        )
         from reportlab.platypus import (
-            SimpleDocTemplate,
             Paragraph,
+            SimpleDocTemplate,
             Spacer,
         )
 
@@ -267,7 +258,6 @@ async def translate_pdf(
             parent=styles["BodyText"],
             fontSize=10,
             leading=15,
-            textColor=black,
             alignment=TA_LEFT,
             spaceAfter=8,
         )
@@ -279,7 +269,6 @@ async def translate_pdf(
             leftMargin=40,
             topMargin=40,
             bottomMargin=40,
-            title=f"Translated {file.filename or 'Document'}",
         )
 
         story = []
@@ -288,8 +277,6 @@ async def translate_pdf(
             paragraph = paragraph.strip()
 
             if paragraph:
-                # Escape basic HTML characters because ReportLab
-                # Paragraph treats the content as XML/HTML.
                 safe_text = (
                     paragraph
                     .replace("&", "&amp;")
@@ -304,13 +291,15 @@ async def translate_pdf(
                     )
                 )
             else:
-                story.append(
-                    Spacer(1, 8)
-                )
+                story.append(Spacer(1, 8))
 
         doc.build(story)
 
         output.seek(0)
+
+        # ----------------------------------------------------
+        # Download filename
+        # ----------------------------------------------------
 
         original_name = file.filename or "document.pdf"
 
@@ -342,7 +331,7 @@ async def translate_pdf(
 
 
 # ============================================================
-# Supported languages
+# LANGUAGES
 # ============================================================
 
 @router.get("/languages")
