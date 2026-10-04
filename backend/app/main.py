@@ -73,6 +73,18 @@ app.add_middleware(
 )
 
 
+@app.get("/", tags=["root"])
+async def root():
+    return {
+        "app": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "running 🚀",
+        "docs": "/api/docs",
+        "health": "/api/healthz",
+        "api": "/api/v1",
+    }
+
+
 @app.get("/api/healthz", tags=["health"])
 async def health_check():
     from app.core.cache import cache
