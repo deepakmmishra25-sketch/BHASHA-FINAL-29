@@ -3,6 +3,7 @@ Application configuration — all values loaded from OS environment.
 """
 
 from typing import List
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
