@@ -1,6 +1,10 @@
 """Translation endpoint — Groq-powered multilingual translation."""
 
-from fastapi import APIRouter, Depends, HTTPException
+import io
+import re
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.api.v1.dependencies import get_current_active_user
@@ -10,9 +14,24 @@ from app.models.user import User
 router = APIRouter(prefix="/translate", tags=["translation"])
 
 SUPPORTED_LANGUAGES = [
-    "English", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu",
-    "Kannada", "Malayalam", "Punjabi", "Bengali", "Urdu", "Odia", "Assamese",
+    "English",
+    "Hindi",
+    "Marathi",
+    "Gujarati",
+    "Tamil",
+    "Telugu",
+    "Kannada",
+    "Malayalam",
+    "Punjabi",
+    "Bengali",
+    "Urdu",
+    "Odia",
+    "Assamese",
 ]
+
+
+MAX_PDF_SIZE = 10 * 1024 * 1024
+CHUNK_SIZE = 10000
 
 
 class TranslateInput(BaseModel):
@@ -21,49 +40,315 @@ class TranslateInput(BaseModel):
     source_language: str = "auto"
 
 
+def get_groq_client():
+    if not settings.GROQ_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="GROQ_API_KEY not configured.",
+        )
+
+    from groq import Groq
+
+    return Groq(api_key=settings.GROQ_API_KEY)
+
+
+def translate_text(client, text: str, target_language: str) -> str:
+    """Translate a single text chunk using Groq."""
+
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a professional document translator. "
+                    f"Translate the given text to {target_language}. "
+                    "Return ONLY the translated text. "
+                    "Do not add explanations, notes, comments, "
+                    "or the original text. "
+                    "Preserve paragraph structure as much as possible."
+                ),
+            },
+            {
+                "role": "user",
+                "content": text,
+            },
+        ],
+        max_tokens=4000,
+        temperature=0.2,
+    )
+
+    return response.choices[0].message.content.strip()
+
+
+def split_text(text: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
+    """Split long text into reasonably sized chunks."""
+
+    paragraphs = re.split(r"\n\s*\n", text)
+
+    chunks = []
+    current = ""
+
+    for paragraph in paragraphs:
+        paragraph = paragraph.strip()
+
+        if not paragraph:
+            continue
+
+        candidate = (
+            f"{current}\n\n{paragraph}"
+            if current
+            else paragraph
+        )
+
+        if len(candidate) <= chunk_size:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+
+            # Handle a single very large paragraph.
+            if len(paragraph) > chunk_size:
+                for i in range(0, len(paragraph), chunk_size):
+                    chunks.append(paragraph[i:i + chunk_size])
+                current = ""
+            else:
+                current = paragraph
+
+    if current:
+        chunks.append(current)
+
+    return chunks
+
+
+# ============================================================
+# Existing text translation endpoint
+# ============================================================
+
 @router.post("")
 async def translate(
     data: TranslateInput,
     _: User = Depends(get_current_active_user),
 ):
-    if not settings.GROQ_API_KEY:
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured.")
+    client = get_groq_client()
 
     try:
-        from groq import Groq
-        client = Groq(api_key=settings.GROQ_API_KEY)
-
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        f"You are a professional translator. "
-                        f"Translate the given text to {data.target_language}. "
-                        f"Return ONLY the translated text, nothing else. "
-                        f"No explanations, no notes, no original text."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": data.text,
-                },
-            ],
-            max_tokens=4000,
-            temperature=0.3,
+        translated = translate_text(
+            client,
+            data.text,
+            data.target_language,
         )
 
-        translated = response.choices[0].message.content.strip()
         return {
             "translatedText": translated,
             "targetLanguage": data.target_language,
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Translation failed: {str(e)[:200]}")
+    except HTTPException:
+        raise
 
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Translation failed: {str(e)[:200]}",
+        )
+
+
+# ============================================================
+# PDF translation endpoint
+# ============================================================
+
+@router.post("/pdf")
+async def translate_pdf(
+    file: UploadFile = File(...),
+    target_language: str = "Hindi",
+    _: User = Depends(get_current_active_user),
+):
+    """
+    Upload a text-based PDF, extract its text, translate it,
+    and return a new translated PDF.
+
+    Note:
+    Scanned/image-only PDFs require OCR and are handled separately.
+    """
+
+    if file.content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are supported.",
+        )
+
+    content = await file.read()
+
+    if len(content) > MAX_PDF_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail="File too large. Maximum PDF size is 10MB.",
+        )
+
+    if target_language not in SUPPORTED_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported language: {target_language}",
+        )
+
+    try:
+        import pypdf
+
+        reader = pypdf.PdfReader(io.BytesIO(content))
+
+        pages = []
+
+        for page in reader.pages:
+            page_text = page.extract_text() or ""
+
+            if page_text.strip():
+                pages.append(page_text.strip())
+
+        original_text = "\n\n".join(pages).strip()
+
+        if not original_text:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "No selectable text was found in this PDF. "
+                    "This appears to be a scanned/image PDF. "
+                    "Please use OCR for scanned documents."
+                ),
+            )
+
+        # ----------------------------------------------------
+        # Translate in chunks
+        # ----------------------------------------------------
+
+        chunks = split_text(original_text)
+
+        if not chunks:
+            raise HTTPException(
+                status_code=400,
+                detail="No readable text found in PDF.",
+            )
+
+        client = get_groq_client()
+
+        translated_chunks = []
+
+        for chunk in chunks:
+            translated_chunk = translate_text(
+                client,
+                chunk,
+                target_language,
+            )
+
+            translated_chunks.append(translated_chunk)
+
+        translated_text = "\n\n".join(translated_chunks)
+
+        # ----------------------------------------------------
+        # Generate PDF
+        # ----------------------------------------------------
+
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.enums import TA_LEFT
+        from reportlab.lib.colors import black
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+        )
+
+        output = io.BytesIO()
+
+        styles = getSampleStyleSheet()
+
+        body_style = ParagraphStyle(
+            "TranslatedBody",
+            parent=styles["BodyText"],
+            fontSize=10,
+            leading=15,
+            textColor=black,
+            alignment=TA_LEFT,
+            spaceAfter=8,
+        )
+
+        doc = SimpleDocTemplate(
+            output,
+            pagesize=A4,
+            rightMargin=40,
+            leftMargin=40,
+            topMargin=40,
+            bottomMargin=40,
+            title=f"Translated {file.filename or 'Document'}",
+        )
+
+        story = []
+
+        for paragraph in translated_text.split("\n"):
+            paragraph = paragraph.strip()
+
+            if paragraph:
+                # Escape basic HTML characters because ReportLab
+                # Paragraph treats the content as XML/HTML.
+                safe_text = (
+                    paragraph
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                )
+
+                story.append(
+                    Paragraph(
+                        safe_text,
+                        body_style,
+                    )
+                )
+            else:
+                story.append(
+                    Spacer(1, 8)
+                )
+
+        doc.build(story)
+
+        output.seek(0)
+
+        original_name = file.filename or "document.pdf"
+
+        if original_name.lower().endswith(".pdf"):
+            original_name = original_name[:-4]
+
+        download_name = (
+            f"{original_name}_{target_language}.pdf"
+        )
+
+        return StreamingResponse(
+            output,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{download_name}"'
+                )
+            },
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"PDF translation failed: {str(e)[:300]}",
+        )
+
+
+# ============================================================
+# Supported languages
+# ============================================================
 
 @router.get("/languages")
-async def list_languages(_: User = Depends(get_current_active_user)):
-    return {"languages": SUPPORTED_LANGUAGES}
+async def list_languages(
+    _: User = Depends(get_current_active_user),
+):
+    return {
+        "languages": SUPPORTED_LANGUAGES
+    }
