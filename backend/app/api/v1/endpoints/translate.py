@@ -1,6 +1,6 @@
-"""Translation endpoint — Gemini-powered multilingual translation."""
+"""Translation endpoint — Groq-powered multilingual translation."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.v1.dependencies import get_current_active_user
@@ -26,22 +26,42 @@ async def translate(
     data: TranslateInput,
     _: User = Depends(get_current_active_user),
 ):
-    if not settings.GEMINI_API_KEY:
-        return {"translatedText": data.text, "note": "Gemini API key not configured — returning original text"}
+    if not settings.GROQ_API_KEY:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY not configured.")
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        from groq import Groq
+        client = Groq(api_key=settings.GROQ_API_KEY)
 
-        prompt = (
-            f"Translate the following text to {data.target_language}. "
-            f"Return ONLY the translated text, no explanations.\n\nText: {data.text}"
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"You are a professional translator. "
+                        f"Translate the given text to {data.target_language}. "
+                        f"Return ONLY the translated text, nothing else. "
+                        f"No explanations, no notes, no original text."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": data.text,
+                },
+            ],
+            max_tokens=4000,
+            temperature=0.3,
         )
-        response = model.generate_content(prompt)
-        return {"translatedText": response.text.strip(), "targetLanguage": data.target_language}
+
+        translated = response.choices[0].message.content.strip()
+        return {
+            "translatedText": translated,
+            "targetLanguage": data.target_language,
+        }
+
     except Exception as e:
-        return {"translatedText": data.text, "error": str(e)[:200]}
+        raise HTTPException(status_code=500, detail=f"Translation failed: {str(e)[:200]}")
 
 
 @router.get("/languages")
