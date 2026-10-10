@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/app.store";
 
 // Voice-first language gate for users who cannot read.
 // Plays the same question in 11 languages, one after another. The first tap
 // starts the voice (browsers block audio until the user touches the page).
-// As soon as the user taps the big button, the voice stops and the whole site
-// switches to that language through the app store.
+// As soon as the user taps the big button, the voice stops, the whole site
+// switches to that language through the app store, and the user goes to login.
 
 const CYCLE_DELAY_MS = 3000;
 
@@ -27,8 +28,8 @@ const GATE_LANGUAGES = [
 
 export function LanguageGate() {
   const setLanguage = useAppStore((s) => s.setLanguage);
+  const router = useRouter();
 
-  const [visible, setVisible] = useState(true);
   const [index, setIndex] = useState(0);
   const [chosen, setChosen] = useState(false);
 
@@ -121,8 +122,8 @@ export function LanguageGate() {
     document.documentElement.lang = item.code;
     document.documentElement.dir = item.code === "ur" ? "rtl" : "ltr";
 
-    // Let the fade-out finish, then remove the overlay
-    setTimeout(() => setVisible(false), 300);
+    // Go straight to login, now in the chosen language
+    router.push("/login");
   }
 
   useEffect(() => {
@@ -151,8 +152,6 @@ export function LanguageGate() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  if (!visible) return null;
 
   const item = GATE_LANGUAGES[index];
 
@@ -187,4 +186,3 @@ export function LanguageGate() {
     </div>
   );
 }
-
