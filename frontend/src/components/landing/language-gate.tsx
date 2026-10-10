@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/app.store";
 
 // Voice-first language gate for users who cannot read.
-// 1st tap: starts the voice (browsers need one touch before playing sound).
-// Voice plays the question in 11 languages one after another.
-// 2nd tap (when the user understands): stops the voice, saves the language,
+// The voice starts by itself as soon as the page opens. If the browser blocks
+// sound until the user touches the screen, the voice starts on the first touch
+// anywhere on the screen. The next tap on the big button saves the language
 // and goes to the login page in that language.
 
 const CYCLE_DELAY_MS = 3000;
@@ -35,6 +35,7 @@ export function LanguageGate() {
   const [chosen, setChosen] = useState(false);
 
   // Refs so timers and audio callbacks always see the latest values
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedRef = useRef(false);
@@ -89,7 +90,20 @@ export function LanguageGate() {
     audio.addEventListener("error", onComplete, { once: true });
 
     const p = audio.play();
-    if (p !== undefined) p.catch(onComplete); // blocked or failed: keep cycling
+    if (p !== undefined) {
+      p.catch((err: unknown) => {
+        if ((err as { name?: string })?.name === "NotAllowedError") {
+          // Browser blocked sound until the user touches the screen.
+          // Go back to "not started" so the next touch starts the voice.
+          stopVoice();
+          startedRef.current = false;
+          setStarted(false);
+          timerRef.current = setTimeout(advance, CYCLE_DELAY_MS);
+        } else {
+          onComplete();
+        }
+      });
+    }
   }
 
   function advance() {
@@ -105,15 +119,25 @@ export function LanguageGate() {
     }
   }
 
-  // First tap: start the voice only. It does NOT choose a language.
+  // Start the voice (used on page load, and on the first touch if the browser blocked it)
   function startVoice() {
     if (startedRef.current || chosenRef.current) return;
+    clearTimer();
     startedRef.current = true;
     setStarted(true);
     playVoice();
   }
 
-  // Second tap: the user understands this language. Save it and go to login.
+  // Tap on the big button: start if not started yet, otherwise save the language
+  function handleButtonTap() {
+    if (!startedRef.current) {
+      startVoice();
+    } else {
+      choose();
+    }
+  }
+
+  // Second tap (after the voice has started): the user understands this language
   function choose() {
     if (chosenRef.current) return;
     const item = GATE_LANGUAGES[indexRef.current];
@@ -129,36 +153,32 @@ export function LanguageGate() {
     router.push("/login");
   }
 
-  function handleTap() {
-    if (!startedRef.current) {
-      startVoice();
-    } else {
-      choose();
-    }
-  }
-
   useEffect(() => {
-    // Start cycling silently; the first tap starts the voice
-    timerRef.current = setTimeout(advance, CYCLE_DELAY_MS);
+    // 1. Try to start the voice right away, with no tap
+    startVoice();
 
-    const onKey = (e: KeyboardEvent) => {
-      if (document.activeElement?.id === "lang-gate-btn") return; // button handles it
-      if (e.key === " " || e.key === "Enter") {
-        e.preventDefault();
-        handleTap();
-      }
+    // 2. If the browser blocked it, the first touch or key press anywhere starts it
+    const onFirstTouch = (e: Event) => {
+      if (startedRef.current || chosenRef.current) return;
+      const target = e.target as Node | null;
+      // Taps on the big button are handled by the button itself
+      if (target && buttonRef.current?.contains(target)) return;
+      startVoice();
     };
     const onVisibility = () => {
       if (document.hidden) stopVoice();
     };
 
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onFirstTouch);
+    window.addEventListener("keydown", onFirstTouch);
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onFirstTouch);
+      window.removeEventListener("keydown", onFirstTouch);
       document.removeEventListener("visibilitychange", onVisibility);
       stopVoice();
+      startedRef.current = false; // allow the voice to start again on a fresh mount
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -175,9 +195,10 @@ export function LanguageGate() {
       aria-label={item.text}
     >
       <button
+        ref={buttonRef}
         id="lang-gate-btn"
         type="button"
-        onClick={handleTap}
+        onClick={handleButtonTap}
         lang={item.code}
         dir={item.code === "ur" ? "rtl" : "ltr"}
         aria-label={item.text}
