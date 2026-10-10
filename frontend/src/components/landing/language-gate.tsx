@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/app.store";
 
 // Voice-first language gate for users who cannot read.
-// Plays the same question in 11 languages, one after another. The first tap
-// starts the voice (browsers block audio until the user touches the page).
-// As soon as the user taps the big button, the voice stops, the whole site
-// switches to that language through the app store, and the user goes to login.
+// 1st tap: starts the voice (browsers need one touch before playing sound).
+// Voice plays the question in 11 languages one after another.
+// 2nd tap (when the user understands): stops the voice, saves the language,
+// and goes to the login page in that language.
 
 const CYCLE_DELAY_MS = 3000;
 
@@ -31,12 +31,13 @@ export function LanguageGate() {
   const router = useRouter();
 
   const [index, setIndex] = useState(0);
+  const [started, setStarted] = useState(false);
   const [chosen, setChosen] = useState(false);
 
   // Refs so timers and audio callbacks always see the latest values
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasInteractedRef = useRef(false);
+  const startedRef = useRef(false);
   const chosenRef = useRef(false);
   const indexRef = useRef(0);
 
@@ -96,20 +97,23 @@ export function LanguageGate() {
     indexRef.current = (indexRef.current + 1) % GATE_LANGUAGES.length;
     setIndex(indexRef.current);
 
-    if (hasInteractedRef.current) {
+    if (startedRef.current) {
       playVoice();
     } else {
-      // No touch yet: keep changing the text silently
+      // Not started yet: keep changing the text silently
       timerRef.current = setTimeout(advance, CYCLE_DELAY_MS);
     }
   }
 
-  function markInteracted() {
-    if (hasInteractedRef.current || chosenRef.current) return;
-    hasInteractedRef.current = true;
+  // First tap: start the voice only. It does NOT choose a language.
+  function startVoice() {
+    if (startedRef.current || chosenRef.current) return;
+    startedRef.current = true;
+    setStarted(true);
     playVoice();
   }
 
+  // Second tap: the user understands this language. Save it and go to login.
   function choose() {
     if (chosenRef.current) return;
     const item = GATE_LANGUAGES[indexRef.current];
@@ -122,20 +126,26 @@ export function LanguageGate() {
     document.documentElement.lang = item.code;
     document.documentElement.dir = item.code === "ur" ? "rtl" : "ltr";
 
-    // Go straight to login, now in the chosen language
     router.push("/login");
   }
 
+  function handleTap() {
+    if (!startedRef.current) {
+      startVoice();
+    } else {
+      choose();
+    }
+  }
+
   useEffect(() => {
-    // Start cycling silently; the first touch or key press starts the voice
+    // Start cycling silently; the first tap starts the voice
     timerRef.current = setTimeout(advance, CYCLE_DELAY_MS);
 
     const onKey = (e: KeyboardEvent) => {
-      if (!hasInteractedRef.current) markInteracted();
-      if (chosenRef.current) return;
-      if ((e.key === " " || e.key === "Enter") && document.activeElement?.id !== "lang-gate-btn") {
+      if (document.activeElement?.id === "lang-gate-btn") return; // button handles it
+      if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
-        choose();
+        handleTap();
       }
     };
     const onVisibility = () => {
@@ -167,15 +177,16 @@ export function LanguageGate() {
       <button
         id="lang-gate-btn"
         type="button"
-        onPointerDown={markInteracted}
-        onTouchStart={markInteracted}
-        onFocus={markInteracted}
-        onClick={choose}
+        onClick={handleTap}
         lang={item.code}
         dir={item.code === "ur" ? "rtl" : "ltr"}
         aria-label={item.text}
-        className="flex h-[calc(100dvh-32px)] min-h-[60vh] w-full max-w-5xl flex-col items-center justify-center rounded-[28px] border-[5px] border-slate-800 bg-slate-900 p-8 text-center text-white shadow-2xl transition active:scale-[0.985] focus-visible:outline focus-visible:outline-[6px] focus-visible:outline-offset-[6px] focus-visible:outline-blue-600 select-none"
+        className="flex h-[calc(100dvh-32px)] min-h-[60vh] w-full max-w-5xl flex-col items-center justify-center gap-8 rounded-[28px] border-[5px] border-slate-800 bg-slate-900 p-8 text-center text-white shadow-2xl transition active:scale-[0.985] focus-visible:outline focus-visible:outline-[6px] focus-visible:outline-offset-[6px] focus-visible:outline-blue-600 select-none"
       >
+        {/* Speaker icon: universal sign for "listen" for people who cannot read */}
+        <span aria-hidden="true" className="text-[clamp(4rem,10vw,7rem)] leading-none">
+          {started ? "🔊" : "🔈"}
+        </span>
         <span
           className="max-w-3xl text-[clamp(2rem,5.2vw,3.8rem)] font-bold leading-snug"
           style={item.code === "ur" ? { fontFamily: '"Noto Nastaliq Urdu", system-ui, sans-serif', lineHeight: 1.7 } : undefined}
