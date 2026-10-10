@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
 
     LOG_LEVEL: str = "INFO"
-        DEMO_LOGIN_ENABLED: bool = False
+    DEMO_LOGIN_ENABLED: bool = False
     DEMO_LOGIN_OTP: str = "998877"
 
     ALLOWED_ORIGINS: List[str] = [
