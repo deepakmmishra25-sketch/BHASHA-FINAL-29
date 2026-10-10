@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     auth,
     chat,
     dashboard,
+    demo_auth,
     lessons,
     notifications,
     ocr,
