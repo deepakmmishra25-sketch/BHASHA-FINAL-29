@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,28 +12,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/store/auth.store";
-import { useAppStore, getLangCode } from "@/store/app.store";
-import { getAuthText } from "@/lib/auth-text";
 import apiClient from "@/lib/api";
 
-type FormData = { email: string; password: string };
+const schema = z.object({
+  name: z.string().trim().min(1, "Please enter your name"),
+  mobile: z.string().regex(/^[6-9]\d{9}$/, "Enter a valid 10-digit mobile number"),
+  otp: z.string().trim().min(1, "Enter the code"),
+});
+
+type FormData = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const language = useAppStore((s) => s.language);
-  const t = getAuthText(getLangCode(language));
   const [loading, setLoading] = useState(false);
-
-  // Validation messages follow the chosen language
-  const schema = useMemo(
-    () =>
-      z.object({
-        email: z.string().email(t.invalidEmail),
-        password: z.string().min(1, t.passwordRequired),
-      }),
-    [t.invalidEmail, t.passwordRequired]
-  );
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -43,19 +34,21 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      const res = await apiClient.post("/auth/login", data);
+      const res = await apiClient.post("/auth/demo-login", data);
       const { access_token, refresh_token } = res.data;
 
-      // Fetch profile
+      // Fetch profile with the new token
       const profileRes = await apiClient.get("/auth/me", {
         headers: { Authorization: `Bearer ${access_token}` },
       });
 
       setAuth(profileRes.data, access_token, refresh_token);
-      toast.success(t.welcomeToast);
+      toast.success(`Welcome, ${data.name}!`);
       router.push("/dashboard");
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t.loginFailed;
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "Sign in failed. Please try again.";
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -65,39 +58,65 @@ export default function LoginPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">{t.welcomeBack}</h1>
-        <p className="text-muted-foreground mt-1">{t.signInSub}</p>
+        <h1 className="text-2xl font-bold text-gray-900">Sign in</h1>
+        <p className="text-muted-foreground mt-1">Enter your name, mobile number and code</p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <div className="space-y-1.5">
-          <Label htmlFor="email">{t.email}</Label>
-          <Input id="email" type="email" placeholder="you@example.com" {...register("email")} />
-          {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+          <Label htmlFor="name" className="text-base">Name</Label>
+          <Input
+            id="name"
+            type="text"
+            autoComplete="name"
+            className="h-14 text-lg"
+            placeholder="Your name"
+            {...register("name")}
+          />
+          {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
         </div>
 
         <div className="space-y-1.5">
-          <div className="flex justify-between items-center">
-            <Label htmlFor="password">{t.password}</Label>
-            <Link href="/forgot-password" className="text-xs text-primary hover:underline">
-              {t.forgot}
-            </Link>
-          </div>
-          <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
-          {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+          <Label htmlFor="mobile" className="text-base">Mobile number</Label>
+          <Input
+            id="mobile"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel-national"
+            maxLength={10}
+            className="h-14 text-lg tracking-wider"
+            placeholder="9876543210"
+            {...register("mobile")}
+          />
+          {errors.mobile && <p className="text-sm text-destructive">{errors.mobile.message}</p>}
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t.signingIn}</> : t.signIn}
+        <div className="space-y-1.5">
+          <Label htmlFor="otp" className="text-base">Code</Label>
+          <Input
+            id="otp"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            className="h-14 text-lg tracking-widest"
+            placeholder="******"
+            {...register("otp")}
+          />
+          {errors.otp && <p className="text-sm text-destructive">{errors.otp.message}</p>}
+        </div>
+
+        <Button type="submit" className="w-full h-14 text-lg" disabled={loading}>
+          {loading ? (
+            <>
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Signing in...
+            </>
+          ) : (
+            "Sign in"
+          )}
         </Button>
       </form>
-
-      <p className="text-center text-sm text-muted-foreground">
-        {t.noAccount}{" "}
-        <Link href="/register" className="text-primary font-medium hover:underline">
-          {t.createOne}
-        </Link>
-      </p>
     </div>
   );
 }
