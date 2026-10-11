@@ -136,7 +136,7 @@ export default function LoginPage() {
             autoComplete="one-time-code"
             maxLength={6}
             className="h-14 text-lg tracking-widest"
-            placeholder="******"
+            placeholder="998877"
             {...register("otp")}
           />
           {errors.otp && <p className="text-sm text-destructive">{errors.otp.message}</p>}
