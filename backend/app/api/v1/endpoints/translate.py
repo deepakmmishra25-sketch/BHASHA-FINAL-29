@@ -72,11 +72,15 @@ def translate_text(client, text: str, target_language: str) -> str:
                 {
                     "role": "system",
                     "content": (
-                        "You are a professional translator. "
-                        f"Translate the following text to {target_language}. "
-                        "Return ONLY the translated text. "
-                        "Do not add explanations, notes, or the original text. "
-                        "Preserve paragraphs and basic structure."
+                        f"You are a professional translator. Translate the ENTIRE text into {target_language}. "
+                        f"Every word, heading, label, and name must be written in the {target_language} script only. "
+                        "Do not leave any English words or Latin letters. Transliterate English words, "
+                        "names, company names, and abbreviations into the script of the target language. "
+                        f"Write every number and digit using {target_language} native digits "
+                        "(for example Devanagari digits for Hindi and Marathi, Kannada digits for Kannada). "
+                        "Keep the ₹ symbol. "
+                        "Return ONLY the translated text. Do not add explanations, notes, or the original text. "
+                        "Preserve paragraphs and line breaks."
                     ),
                 },
                 {
