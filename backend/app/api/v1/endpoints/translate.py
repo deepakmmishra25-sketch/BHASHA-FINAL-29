@@ -1,8 +1,9 @@
-"""Translation endpoint — Groq-powered multilingual translation."""
+"""Translation endpoint — Groq-powered multilingual translation (direct HTTP, no SDK)."""
 
 import io
 import re
 
+import httpx
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -12,6 +13,10 @@ from app.core.config import settings
 from app.models.user import User
 
 router = APIRouter(prefix="/translate", tags=["translation"])
+
+GROQ_BASE_URL = "https://api.groq.com"
+GROQ_CHAT_PATH = "/openai/v1/chat/completions"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 SUPPORTED_LANGUAGES = [
     "English",
@@ -46,37 +51,51 @@ def get_groq_client():
             detail="GROQ_API_KEY not configured.",
         )
 
-    from groq import Groq
-
-    return Groq(api_key=settings.GROQ_API_KEY)
+    return httpx.Client(
+        base_url=GROQ_BASE_URL,
+        headers={
+            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        timeout=120,
+    )
 
 
 def translate_text(client, text: str, target_language: str) -> str:
-    """Translate text using Groq."""
+    """Translate text using Groq (plain HTTP request)."""
 
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a professional translator. "
-                    f"Translate the following text to {target_language}. "
-                    "Return ONLY the translated text. "
-                    "Do not add explanations, notes, or the original text. "
-                    "Preserve paragraphs and basic structure."
-                ),
-            },
-            {
-                "role": "user",
-                "content": text,
-            },
-        ],
-        max_tokens=4000,
-        temperature=0.2,
+    response = client.post(
+        GROQ_CHAT_PATH,
+        json={
+            "model": GROQ_MODEL,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a professional translator. "
+                        f"Translate the following text to {target_language}. "
+                        "Return ONLY the translated text. "
+                        "Do not add explanations, notes, or the original text. "
+                        "Preserve paragraphs and basic structure."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": text,
+                },
+            ],
+            "max_tokens": 4000,
+            "temperature": 0.2,
+        },
     )
 
-    return response.choices[0].message.content.strip()
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Groq returned {response.status_code}: {response.text[:200]}"
+        )
+
+    data = response.json()
+    return data["choices"][0]["message"]["content"].strip()
 
 
 def split_text(text: str, chunk_size: int = CHUNK_SIZE) -> list[str]:
@@ -150,9 +169,12 @@ async def translate(
             detail=f"Translation failed: {str(e)[:200]}",
         )
 
+    finally:
+        client.close()
+
 
 # ============================================================
-# PDF TRANSLATION
+# PDF TRANSLATION (downloads a translated PDF)
 # ============================================================
 
 @router.post("/pdf")
@@ -182,6 +204,8 @@ async def translate_pdf(
             status_code=400,
             detail="File too large. Maximum size is 10MB.",
         )
+
+    client = None
 
     try:
         # ----------------------------------------------------
@@ -328,6 +352,10 @@ async def translate_pdf(
             status_code=500,
             detail=f"PDF translation failed: {str(e)[:300]}",
         )
+
+    finally:
+        if client is not None:
+            client.close()
 
 
 # ============================================================
