@@ -30,7 +30,7 @@ export default function TranslatePage() {
   const mutation = useMutation({
     mutationFn: () => apiClient.post("/translate", { text: sourceText, target_language: targetLang }),
     onSuccess: (res) => setResult(res.data.translatedText),
-    onError: () => toast.error("Translation failed"),
+    onError: (err: unknown) => toast.error(((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail) || "Translation failed"),
   });
 
   const swap = () => { setSourceText(result); setResult(sourceText); };
