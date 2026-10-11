@@ -16,7 +16,7 @@ router = APIRouter(prefix="/translate", tags=["translation"])
 
 GROQ_BASE_URL = "https://api.groq.com"
 GROQ_CHAT_PATH = "/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 SUPPORTED_LANGUAGES = [
     "English",
