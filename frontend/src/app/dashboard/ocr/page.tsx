@@ -64,7 +64,7 @@ export default function OCRPage() {
       setTranslated(res.data.translatedText);
       toast.success("Translated!");
     },
-    onError: () => toast.error("Translation failed"),
+    onError: (err: unknown) => toast.error(((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail) || "Translation failed"),
   });
 
   const handleFile = (f: File) => {
