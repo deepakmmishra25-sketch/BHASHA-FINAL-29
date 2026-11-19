@@ -36,6 +36,8 @@ async def seed_categories() -> None:
         session.add_all(categories)
         await session.commit()
         logger.info("✅ Seeded default categories")
+
+
 async def seed_lessons() -> None:
     """Seed knowledge-base lessons if none exist."""
     from sqlalchemy import select
@@ -542,6 +544,13 @@ WhatsApp Business API (for larger businesses with 1000+ customers) allows chatbo
         session.add_all(lessons)
         await session.commit()
         logger.info(f"✅ Seeded {len(lessons)} knowledge-base lessons")
+
+
+async def seed_schemes() -> None:
+    """Seed government schemes if none exist. Placeholder — populate when Scheme model is ready."""
+    pass
+
+
 async def init_db() -> None:
     await create_tables()
     await seed_categories()
