@@ -50,7 +50,7 @@ const LEVEL_LABELS: Record<string, Record<string, string>> = {
   Tamil: { beginner: "தொடக்கநிலை", intermediate: "இடைநிலை", advanced: "மேம்பட்ட" },
   Telugu: { beginner: "ప్రారంభ", intermediate: "మధ్యమ", advanced: "అధునాతన" },
   Kannada: { beginner: "ಆರಂಭಿಕ", intermediate: "ಮಧ್ಯಮ", advanced: "ಸುಧಾರಿತ" },
-  Malayalam: { beginner: "തുടക്കക്കാർ", intermediate: "ഇടക്കാൽ", advanced: "വിദഗ്ദ്ധ" },
+  Malayalam: { beginner: "തുടക്കക്കാർ", intermediate: "ഇടക്കാൽ", advanced: "വിദഗ್ದ്ധ" },
   Punjabi: { beginner: "ਸ਼ੁਰੂਆਤੀ", intermediate: "ਦਰਮਿਆਨੀ", advanced: "ਉੱਨਤ" },
   Bengali: { beginner: "প্রাথমিক", intermediate: "মধ্যবর্তী", advanced: "উন্নত" },
   Urdu: { beginner: "ابتدائی", intermediate: "درمیانی", advanced: "اعلی" },
@@ -62,7 +62,6 @@ function getLevelLabel(language: string, level: string): string {
   return LEVEL_LABELS[language]?.[level] ?? level;
 }
 
-// Extract YouTube video ID from different YouTube URL formats
 function getYouTubeVideoId(url: string): string | null {
   if (!url || typeof url !== "string") return null;
 
@@ -101,8 +100,9 @@ function getYouTubeVideoId(url: string): string | null {
   }
 }
 
-// Redirect to the actual YouTube video
-function getYouTubeWatchUrl(url: string): string | null {
+function getYouTubeWatchUrl(url?: string): string | null {
+  if (!url) return null;
+
   const videoId = getYouTubeVideoId(url);
 
   return videoId
@@ -110,7 +110,6 @@ function getYouTubeWatchUrl(url: string): string | null {
     : null;
 }
 
-// YouTube thumbnail
 function getYouTubeThumbnail(url: string): string | null {
   const videoId = getYouTubeVideoId(url);
 
@@ -211,9 +210,7 @@ export default function LessonsPage() {
 
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["lessons"] });
-
       toast.success(t(language, "completed") + "! 🎉");
-
       setSelectedLesson(null);
     },
   });
@@ -230,8 +227,6 @@ export default function LessonsPage() {
           {t(language, "learnDesc")}
         </p>
       </div>
-
-      {/* Categories */}
 
       <div className="flex flex-wrap gap-2">
 
@@ -265,8 +260,6 @@ export default function LessonsPage() {
         ))}
 
       </div>
-
-      {/* Lessons */}
 
       {isLoading ? (
 
@@ -311,22 +304,16 @@ export default function LessonsPage() {
                     l.completed && "ring-1 ring-green-300"
                   )}
 
-                  // DIRECT YOUTUBE REDIRECT
                   onClick={() => {
+                    const youtubeLink = getYouTubeWatchUrl(l.youtubeUrl);
 
-                    const youtubeLink = l.youtubeUrl
-                      ? getYouTubeWatchUrl(l.youtubeUrl)
-                      : null;
+                    const destination =
+                      youtubeLink ||
+                      `https://www.youtube.com/results?search_query=${encodeURIComponent(
+                        l.title
+                      )}`;
 
-                    if (!youtubeLink) {
-                      toast.error(
-                        "YouTube video link is missing or invalid."
-                      );
-                      return;
-                    }
-
-                    window.location.href = youtubeLink;
-
+                    window.location.assign(destination);
                   }}
                 >
 
@@ -398,15 +385,11 @@ export default function LessonsPage() {
                 </Card>
 
               </motion.div>
-
             );
           })}
 
         </div>
-
       )}
-
-      {/* Existing lesson completion modal */}
 
       <AnimatePresence>
 
