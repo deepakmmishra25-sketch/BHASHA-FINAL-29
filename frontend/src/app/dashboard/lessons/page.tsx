@@ -62,14 +62,17 @@ function getLevelLabel(language: string, level: string): string {
 }
 
 function getYouTubeEmbedUrl(url: string): string | null {
+  if (!url) return null;
   try {
     const u = new URL(url);
     let videoId: string | null = null;
-    if (u.hostname.includes("youtu.be")) {
-      videoId = u.pathname.slice(1);
+
+    if (u.hostname === "youtu.be") {
+      videoId = u.pathname.slice(1).split("?")[0];
     } else if (u.hostname.includes("youtube.com")) {
       videoId = u.searchParams.get("v");
     }
+
     if (!videoId) return null;
     return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
   } catch {
@@ -305,8 +308,8 @@ export default function LessonsPage() {
                 </div>
               ) : (
                 <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-muted-foreground text-sm">
-                  {t(language, "noLessons")}
-                </div>
+  No video available
+</div>
               )}
 
               <div className="p-5">
