@@ -1,3 +1,41 @@
+"""Database initialisation — create all tables and seed essential data."""
+
+from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from app.db.database import Base, engine
+
+
+async def create_tables() -> None:
+    """Create all SQLAlchemy tables (idempotent)."""
+    import app.models  # noqa: F401
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("✅ Database tables verified / created")
+
+
+async def seed_categories() -> None:
+    from sqlalchemy import select
+    from app.db.database import AsyncSessionLocal
+    from app.models.lesson import Category
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Category).limit(1))
+        if result.scalar_one_or_none():
+            return
+
+        categories = [
+            Category(slug="business", name="Business Basics", name_hindi="व्यापार की मूल बातें", description="", icon="Briefcase", color="blue", sort_order=1),
+            Category(slug="finance", name="Finance & Banking", name_hindi="वित्त और बैंकिंग", description="", icon="Banknote", color="green", sort_order=2),
+            Category(slug="farming", name="Farming & Agriculture", name_hindi="खेती और कृषि", description="", icon="Wheat", color="yellow", sort_order=3),
+            Category(slug="digital", name="Digital Literacy", name_hindi="डिजिटल साक्षरता", description="", icon="Smartphone", color="purple", sort_order=4),
+            Category(slug="marketing", name="Marketing & Sales", name_hindi="विपणन और बिक्री", description="", icon="TrendingUp", color="orange", sort_order=5),
+            Category(slug="legal", name="Legal & Compliance", name_hindi="कानूनी और अनुपालन", description="", icon="Scale", color="red", sort_order=6),
+        ]
+        session.add_all(categories)
+        await session.commit()
+        logger.info("✅ Seeded default categories")
 async def seed_lessons() -> None:
     """Seed knowledge-base lessons if none exist."""
     from sqlalchemy import select
@@ -504,3 +542,8 @@ WhatsApp Business API (for larger businesses with 1000+ customers) allows chatbo
         session.add_all(lessons)
         await session.commit()
         logger.info(f"✅ Seeded {len(lessons)} knowledge-base lessons")
+async def init_db() -> None:
+    await create_tables()
+    await seed_categories()
+    await seed_lessons()
+    await seed_schemes()
